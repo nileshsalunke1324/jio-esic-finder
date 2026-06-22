@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Jio ESIC PIN Finder</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f5f6fa; min-height: 100vh; }
+  .header { background: #0a2463; color: #fff; padding: 1rem 1.5rem; display: flex; align-items: center; justify-content: space-between; }
+  .header-title { font-size: 18px; font-weight: 600; }
+  .header-sub { font-size: 12px; opacity: 0.7; margin-top: 2px; }
+  .admin-btn { background: rgba(255,255,255,0.15); border: 1px solid rgba(255,255,255,0.3); color: #fff; padding: 6px 14px; border-radius: 6px; cursor: pointer; font-size: 13px; }
+  .admin-btn:hover { background: rgba(255,255,255,0.25); }
+  .container { max-width: 640px; margin: 2rem auto; padding: 0 1rem; }
+  .card { background: #fff; border-radius: 12px; border: 0.5px solid #e2e4ea; padding: 1.5rem; margin-bottom: 1.5rem; }
+  .card h2 { font-size: 15px; font-weight: 500; color: #1a1a2e; margin-bottom: 1rem; }
+  .input-row { display: flex; gap: 10px; }
+  input[type="text"], input[type="password"] { flex: 1; padding: 10px 14px; border: 1px solid #dde1ea; border-radius: 8px; font-size: 15px; outline: none; transition: border 0.2s; }
+  input[type="text"]:focus, input[type="password"]:focus { border-color: #0a2463; }
+  .btn { background: #0a2463; color: #fff; border: none; padding: 10px 20px; border-radius: 8px; font-size: 14px; cursor: pointer; font-weight: 500; white-space: nowrap; }
+  .btn:hover { background: #0d2e7a; }
+  .btn:disabled { background: #b0b5c4; cursor: not-allowed; }
+  .btn-outline { background: transparent; color: #0a2463; border: 1px solid #0a2463; }
+  .btn-outline:hover { background: #f0f3ff; }
+  .result-card { background: #f0f4ff; border: 1px solid #c5d0f5; border-radius: 10px; padding: 1.25rem; margin-top: 1rem; }
+  .result-title { font-size: 12px; font-weight: 600; color: #5a6690; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 0.75rem; }
+  .result-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .result-item label { font-size: 11px; color: #7a82a0; display: block; margin-bottom: 3px; }
+  .result-item span { font-size: 16px; font-weight: 500; color: #1a1a2e; }
+  .result-item.full { grid-column: 1 / -1; }
+  .error { background: #fff2f2; border: 1px solid #ffc5c5; color: #b00; border-radius: 8px; padding: 10px 14px; margin-top: 1rem; font-size: 14px; }
+  .success { background: #f0fff4; border: 1px solid #b2dfdb; color: #1b5e20; border-radius: 8px; padding: 10px 14px; margin-top: 1rem; font-size: 14px; }
+  .info { background: #e8f0fe; border: 1px solid #b8ccf8; color: #1a3a8f; border-radius: 8px; padding: 10px 14px; margin-top: 1rem; font-size: 14px; }
+  .loading { color: #5a6690; font-size: 14px; margin-top: 1rem; display: flex; align-items: center; gap: 8px; }
+  .spinner { width: 16px; height: 16px; border: 2px solid #c5d0f5; border-top-color: #0a2463; border-radius: 50%; animation: spin 0.8s linear infinite; flex-shrink: 0; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .db-status { font-size: 12px; color: #7a82a0; margin-top: 0.5rem; }
+  .db-status span { font-weight: 500; color: #0a2463; }
+  .overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.4); z-index: 100; align-items: center; justify-content: center; }
+  .overlay.show { display: flex; }
+  .modal { background: #fff; border-radius: 14px; padding: 1.5rem; width: 90%; max-width: 460px; }
+  .modal h3 { font-size: 16px; font-weight: 500; margin-bottom: 1rem; color: #1a1a2e; }
+  .modal-btns { display: flex; gap: 10px; margin-top: 1rem; justify-content: flex-end; }
+  .upload-area { border: 2px dashed #c5d0f5; border-radius: 10px; padding: 2rem; text-align: center; cursor: pointer; transition: border 0.2s; margin: 1rem 0; }
+  .upload-area:hover { border-color: #0a2463; }
+  .upload-area p { color: #7a82a0; font-size: 14px; }
+  .upload-area strong { color: #0a2463; display: block; font-size: 15px; margin-bottom: 6px; }
+  #fileInput { display: none; }
+  .tag { display: inline-block; background: #e8edf8; color: #0a2463; font-size: 13px; padding: 2px 10px; border-radius: 4px; font-weight: 600; }
+  .note { font-size: 12px; color: #7a82a0; margin-top: 10px; font-style: italic; }
+  .progress-wrap { margin-top: 1rem; }
+  .progress-label { font-size: 13px; color: #5a6690; margin-bottom: 6px; display: flex; justify-content: space-between; }
+  .progress-bar-bg { background: #e2e8f8; border-radius: 20px; height: 10px; overflow: hidden; }
+  .progress-bar-fill { background: #0a2463; height: 10px; border-radius: 20px; transition: width 0.3s ease; }
+  .map-thumb { width: 100%; height: 180px; border-radius: 8px; border: 1px solid #c5d0f5; margin-top: 12px; overflow: hidden; }
+  .map-thumb iframe { width: 100%; height: 100%; border: none; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div>
+    <div class="header-title">Jio ESIC PIN Finder</div>
+    <div class="header-sub">Find the nearest ESIC facility for any employee PIN code</div>
+  </div>
+  <button class="admin-btn" onclick="showAdminLogin()">Admin</button>
+</div>
+
+<div class="container">
+  <div class="card">
+    <h2>Enter employee PIN code</h2>
+    <div class="input-row">
+      <input type="text" id="empPin" placeholder="e.g. 400072" maxlength="6"
+        oninput="this.value=this.value.replace(/\D/g,'')"
+        onkeydown="if(event.key==='Enter') findNearest()" />
+      <button class="btn" onclick="findNearest()" id="searchBtn">Find nearest</button>
+    </div>
+    <div class="db-status" id="dbStatus">Loading ESIC database...</div>
+    <div id="resultArea"></div>
+  </div>
+</div>
+
+<!-- Admin login modal -->
+<div class="overlay" id="adminOverlay">
+  <div class="modal">
+    <h3>Admin login</h3>
+    <input type="password" id="adminPass" placeholder="Enter admin password"
+      style="width:100%;margin-bottom:8px;"
+      onkeydown="if(event.key==='Enter') doLogin()" />
+    <div id="loginError" class="error" style="display:none;">Incorrect password.</div>
+    <div class="modal-btns">
+      <button class="btn btn-outline" onclick="closeModal()">Cancel</button>
+      <button class="btn" onclick="doLogin()">Login</button>
+    </div>
+  </div>
+</div>
+
+<!-- Upload modal -->
+<div class="overlay" id="uploadOverlay">
+  <div class="modal" style="max-width:500px;">
+    <h3>Update ESIC database</h3>
+    <p style="font-size:13px;color:#7a82a0;">Upload a new Excel file. Coordinates will be pre-computed on upload so searches are fast. Required columns: <strong>State, City, Pin Code, Final Build ID</strong></p>
+    <div class="upload-area" id="uploadArea" onclick="document.getElementById('fileInput').click()">
+      <strong>Click to choose Excel file</strong>
+      <p>.xlsx or .xls format</p>
+    </div>
+    <input type="file" id="fileInput" accept=".xlsx,.xls" onchange="handleFile(event)" />
+    <div id="uploadStatus"></div>
+    <div id="uploadProgress" style="display:none;" class="progress-wrap">
+      <div class="progress-label"><span id="progressText">Geocoding facilities...</span><span id="progressPct">0%</span></div>
+      <div class="progress-bar-bg"><div class="progress-bar-fill" id="progressFill" style="width:0%"></div></div>
+    </div>
+    <div class="modal-btns">
+      <button class="btn btn-outline" onclick="closeUpload()" id="closeUploadBtn">Close</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const ADMIN_PASS = 'Jio@2026';
+const STORAGE_KEY = 'jio_esic_pins_v2';
+const EMP_CACHE_KEY = 'jio_emp_pin_cache_v1';
+let esicData = [];
+let empPinCache = {};
+
+async function loadData() {
+  try {
+    const r = await window.storage.get(STORAGE_KEY);
+    if (r && r.value) { esicData = JSON.parse(r.value); updateDbStatus(); }
+    else { document.getElementById('dbStatus').textContent = 'No ESIC data loaded. Admin must upload Excel file.'; }
+  } catch(e) { document.getElementById('dbStatus').textContent = 'No ESIC data loaded. Admin must upload Excel file.'; }
+  try {
+    const c = await window.storage.get(EMP_CACHE_KEY);
+    if (c && c.value) empPinCache = JSON.parse(c.value);
+  } catch(e) {}
+}
+
+function updateDbStatus() {
+  const ready = esicData.filter(f => f.lat != null).length;
+  document.getElementById('dbStatus').innerHTML =
+    `Database: <span>${esicData.length} ESIC facilities</span> &nbsp;|&nbsp; <span>${ready} geocoded</span>`;
+}
+
+function toRad(d) { return d * Math.PI / 180; }
+function haversine(la1, lo1, la2, lo2) {
+  const R = 6371, dLa = toRad(la2-la1), dLo = toRad(lo2-lo1);
+  const a = Math.sin(dLa/2)**2 + Math.cos(toRad(la1))*Math.cos(toRad(la2))*Math.sin(dLo/2)**2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+}
+
+function extractJSON(text) {
+  try { return JSON.parse(text.trim()); } catch(_) {}
+  const s = text.replace(/```[\w]*\n?/g,'').trim();
+  try { return JSON.parse(s); } catch(_) {}
+  const i1 = text.indexOf('['), i2 = text.lastIndexOf(']');
+  if (i1 !== -1 && i2 > i1) { try { return JSON.parse(text.slice(i1, i2+1)); } catch(_) {} }
+  const j1 = text.indexOf('{'), j2 = text.lastIndexOf('}');
+  if (j1 !== -1 && j2 > j1) { try { return JSON.parse('[' + text.slice(j1, j2+1) + ']'); } catch(_) {} }
+  throw new Error('Could not parse AI response.');
+}
+
+async function claudeCall(prompt, maxTokens) {
+  const res = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      model: 'claude-sonnet-4-6',
+      max_tokens: maxTokens || 1000,
+      system: 'You are a geocoding assistant. Always respond with valid raw JSON only. No markdown, no code fences, no explanation. Just the JSON.',
+      messages: [{ role: 'user', content: prompt }]
+    })
+  });
+  const data = await res.json();
+  if (data.error) throw new Error(data.error.message);
+  const text = data.content.filter(b => b.type === 'text').map(b => b.text).join('');
+  return extractJSON(text);
+}
+
+async function geocodePins(pins) {
+  const prompt = `Return a JSON array of coordinates for these Indian postal PIN codes.
+Format: [{"pin":"XXXXXX","lat":12.3456,"lon":77.1234}]
+Use null for unknown PINs. PIN codes: ${pins.join(', ')}`;
+  return claudeCall(prompt, 1000);
+}
+
+async function getRoadDistances(empLat, empLon, empPin, facilities) {
+  const list = facilities.map((f,i) =>
+    `${i+1}. PIN ${f.pin}, ${f.city}, ${f.state} (lat:${f.lat.toFixed(4)},lon:${f.lon.toFixed(4)})`
+  ).join('\n');
+  const prompt = `Employee is at lat ${empLat.toFixed(4)}, lon ${empLon.toFixed(4)} (PIN ${empPin}, India).
+Estimate road distance in km to each ESIC facility using Indian road network knowledge.
+Return JSON array: [{"i":1,"pin":"XXXXXX","km":12.5}]
+Facilities:\n${list}`;
+  return claudeCall(prompt, 600);
+}
+
+async function findNearest() {
+  const pin = document.getElementById('empPin').value.trim();
+  const area = document.getElementById('resultArea');
+  if (pin.length !== 6) { area.innerHTML = '<div class="error">Please enter a valid 6-digit PIN code.</div>'; return; }
+  if (!esicData.length) { area.innerHTML = '<div class="error">ESIC database is empty. Please ask admin to upload the data.</div>'; return; }
+
+  const geocodedFacilities = esicData.filter(f => f.lat != null);
+  if (!geocodedFacilities.length) {
+    area.innerHTML = '<div class="info">ESIC coordinates not yet computed. Please ask admin to re-upload the Excel file to enable fast search.</div>';
+    return;
+  }
+
+  document.getElementById('searchBtn').disabled = true;
+  area.innerHTML = '<div class="loading"><div class="spinner"></div> Locating employee PIN code...</div>';
+
+  try {
+    // Step 1: employee coords — use cache if available
+    let empCoords = empPinCache[pin];
+    if (!empCoords) {
+      const empGeo = await geocodePins([pin]);
+      const e = Array.isArray(empGeo) ? empGeo[0] : empGeo;
+      if (!e || e.lat == null) {
+        area.innerHTML = '<div class="error">Could not locate PIN code ' + pin + '. Please check and try again.</div>';
+        document.getElementById('searchBtn').disabled = false; return;
+      }
+      empCoords = { lat: e.lat, lon: e.lon };
+      empPinCache[pin] = empCoords;
+      window.storage.set(EMP_CACHE_KEY, JSON.stringify(empPinCache));
+    }
+
+    area.innerHTML = '<div class="loading"><div class="spinner"></div> Calculating road distances...</div>';
+
+    // Step 2: sort by haversine, take top 8
+    const sorted = geocodedFacilities
+      .map(f => ({ ...f, straight: haversine(empCoords.lat, empCoords.lon, f.lat, f.lon) }))
+      .sort((a,b) => a.straight - b.straight)
+      .slice(0, 8);
+
+    // Step 3: road distances for top 8
+    let bestFacility = sorted[0], bestKm = sorted[0].straight, isRoad = false;
+    try {
+      const roads = await getRoadDistances(empCoords.lat, empCoords.lon, pin, sorted);
+      if (Array.isArray(roads) && roads.length) {
+        roads.sort((a,b) => a.km - b.km);
+        const best = roads[0];
+        const idx = (best.i || 1) - 1;
+        if (sorted[idx]) { bestFacility = sorted[idx]; bestKm = best.km; isRoad = true; }
+      }
+    } catch(e) { console.warn('Road distance fallback to straight-line'); }
+
+    const distLabel = bestKm < 1 ? (bestKm * 1000).toFixed(0) + ' m' : bestKm.toFixed(1) + ' km';
+    const distNote = isRoad ? 'by road' : 'straight-line estimate';
+    const mapUrl = `https://www.openstreetmap.org/export/embed.html?bbox=${(bestFacility.lon-0.05).toFixed(4)},${(bestFacility.lat-0.05).toFixed(4)},${(bestFacility.lon+0.05).toFixed(4)},${(bestFacility.lat+0.05).toFixed(4)}&layer=mapnik&marker=${bestFacility.lat.toFixed(4)},${bestFacility.lon.toFixed(4)}`;
+
+    area.innerHTML = `
+      <div class="result-card">
+        <div class="result-title">Nearest ESIC facility</div>
+        <div class="result-grid">
+          <div class="result-item">
+            <label>ESIC PIN code</label>
+            <span>${bestFacility.pin}</span>
+          </div>
+          <div class="result-item">
+            <label>Final Build ID</label>
+            <span class="tag">${bestFacility.buildId}</span>
+          </div>
+          <div class="result-item">
+            <label>City</label>
+            <span>${bestFacility.city}</span>
+          </div>
+          <div class="result-item">
+            <label>State</label>
+            <span>${bestFacility.state}</span>
+          </div>
+          <div class="result-item full">
+            <label>Distance from employee PIN ${pin}</label>
+            <div style="margin-top:4px;">
+              <span style="font-size:22px;font-weight:600;color:#0a2463;">${distLabel}</span>
+              <span style="font-size:13px;color:#5a6690;margin-left:6px;">${distNote}</span>
+            </div>
+          </div>
+          <div class="result-item full">
+            <label>Facility location on map</label>
+            <div class="map-thumb">
+              <iframe src="${mapUrl}" title="ESIC facility map"></iframe>
+            </div>
+          </div>
+        </div>
+        <p class="note">Road distance is an AI estimate based on Indian road network knowledge.</p>
+      </div>`;
+  } catch(e) {
+    area.innerHTML = '<div class="error">Something went wrong: ' + e.message + '</div>';
+  }
+  document.getElementById('searchBtn').disabled = false;
+}
+
+// Admin
+function showAdminLogin() { document.getElementById('adminOverlay').classList.add('show'); setTimeout(() => document.getElementById('adminPass').focus(), 100); }
+function closeModal() { document.getElementById('adminOverlay').classList.remove('show'); document.getElementById('adminPass').value = ''; document.getElementById('loginError').style.display = 'none'; }
+function doLogin() { if (document.getElementById('adminPass').value === ADMIN_PASS) { closeModal(); document.getElementById('uploadOverlay').classList.add('show'); } else { document.getElementById('loginError').style.display = 'block'; } }
+function closeUpload() { document.getElementById('uploadOverlay').classList.remove('show'); document.getElementById('uploadStatus').innerHTML = ''; document.getElementById('uploadProgress').style.display = 'none'; }
+
+function setProgress(done, total) {
+  const pct = Math.round((done / total) * 100);
+  document.getElementById('progressFill').style.width = pct + '%';
+  document.getElementById('progressPct').textContent = pct + '%';
+  document.getElementById('progressText').textContent = `Geocoding ${done} of ${total} facilities...`;
+}
+
+async function handleFile(e) {
+  const file = e.target.files[0]; if (!file) return;
+  const statusEl = document.getElementById('uploadStatus');
+  const progressEl = document.getElementById('uploadProgress');
+  statusEl.innerHTML = '<div class="loading"><div class="spinner"></div> Reading file...</div>';
+  progressEl.style.display = 'none';
+  document.getElementById('closeUploadBtn').disabled = true;
+
+  const reader = new FileReader();
+  reader.onload = async (evt) => {
+    try {
+      const wb = XLSX.read(evt.target.result, { type: 'binary' });
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json(ws, { defval: '' });
+      const parsed = [];
+      for (const row of rows) {
+        const keys = Object.keys(row);
+        const stateKey = keys.find(k => k.toLowerCase().includes('state'));
+        const cityKey = keys.find(k => k.toLowerCase().includes('city'));
+        const pinKey = keys.find(k => k.toLowerCase().includes('pin'));
+        const buildKey = keys.find(k => k.toLowerCase().includes('build'));
+        if (!pinKey || !buildKey) continue;
+        const pin = String(row[pinKey]).trim();
+        const buildId = String(row[buildKey]).trim();
+        if (/^\d{6}$/.test(pin) && buildId) {
+          parsed.push({ state: stateKey ? String(row[stateKey]).trim() : '', city: cityKey ? String(row[cityKey]).trim() : '', pin, buildId, lat: null, lon: null });
+        }
+      }
+      if (!parsed.length) { statusEl.innerHTML = '<div class="error">No valid rows found.</div>'; document.getElementById('closeUploadBtn').disabled = false; return; }
+
+      statusEl.innerHTML = `<div class="info">Read ${parsed.length} facilities. Now geocoding — this is a one-time process...</div>`;
+      progressEl.style.display = 'block';
+      setProgress(0, parsed.length);
+
+      // Geocode in batches of 30, storing coords into parsed array
+      const batchSize = 30;
+      let done = 0;
+      const uniquePins = [...new Set(parsed.map(f => f.pin))];
+      const coordMap = {};
+
+      for (let i = 0; i < uniquePins.length; i += batchSize) {
+        const batch = uniquePins.slice(i, i + batchSize);
+        try {
+          const results = await geocodePins(batch);
+          if (Array.isArray(results)) {
+            for (const r of results) { if (r && r.lat != null) coordMap[String(r.pin)] = { lat: r.lat, lon: r.lon }; }
+          }
+        } catch(err) { console.warn('Geocode batch error:', err.message); }
+        done = Math.min(done + batchSize, uniquePins.length);
+        setProgress(done, uniquePins.length);
+      }
+
+      for (const f of parsed) {
+        if (coordMap[f.pin]) { f.lat = coordMap[f.pin].lat; f.lon = coordMap[f.pin].lon; }
+      }
+
+      const geocoded = parsed.filter(f => f.lat != null).length;
+      await window.storage.set(STORAGE_KEY, JSON.stringify(parsed));
+      esicData = parsed;
+      updateDbStatus();
+      setProgress(uniquePins.length, uniquePins.length);
+      statusEl.innerHTML = `<div class="success">Done! ${parsed.length} facilities loaded, ${geocoded} geocoded. Searches are now fast!</div>`;
+      document.getElementById('fileInput').value = '';
+    } catch(err) {
+      statusEl.innerHTML = '<div class="error">Error: ' + err.message + '</div>';
+    }
+    document.getElementById('closeUploadBtn').disabled = false;
+  };
+  reader.readAsBinaryString(file);
+}
+
+loadData();
+</script>
+</body>
+</html>
