@@ -6,61 +6,61 @@
 <title>Jio ESIC PIN Finder</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f5f6fa; min-height: 100vh; }
-  .header { background: #0a2463; color: #fff; padding: 1rem 1.5rem; display: flex; align-items: center; justify-content: space-between; }
-  .header-title { font-size: 18px; font-weight: 600; }
-  .header-sub { font-size: 12px; opacity: 0.7; margin-top: 2px; }
-  .admin-btn { background: rgba(255,255,255,0.15); border: 1px solid rgba(255,255,255,0.3); color: #fff; padding: 6px 14px; border-radius: 6px; cursor: pointer; font-size: 13px; }
-  .admin-btn:hover { background: rgba(255,255,255,0.25); }
-  .container { max-width: 640px; margin: 2rem auto; padding: 0 1rem; }
-  .card { background: #fff; border-radius: 12px; border: 0.5px solid #e2e4ea; padding: 1.5rem; margin-bottom: 1.5rem; }
-  .card h2 { font-size: 15px; font-weight: 500; color: #1a1a2e; margin-bottom: 1rem; }
-  .input-row { display: flex; gap: 10px; }
-  input[type="text"], input[type="password"] { flex: 1; padding: 10px 14px; border: 1px solid #dde1ea; border-radius: 8px; font-size: 15px; outline: none; transition: border 0.2s; }
-  input[type="text"]:focus, input[type="password"]:focus { border-color: #0a2463; }
-  .btn { background: #0a2463; color: #fff; border: none; padding: 10px 20px; border-radius: 8px; font-size: 14px; cursor: pointer; font-weight: 500; white-space: nowrap; }
-  .btn:hover { background: #0d2e7a; }
-  .btn:disabled { background: #b0b5c4; cursor: not-allowed; }
-  .btn-outline { background: transparent; color: #0a2463; border: 1px solid #0a2463; }
-  .btn-outline:hover { background: #f0f3ff; }
-  .result-card { background: #f0f4ff; border: 1px solid #c5d0f5; border-radius: 10px; padding: 1.25rem; margin-top: 1rem; }
-  .result-title { font-size: 12px; font-weight: 600; color: #5a6690; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 0.75rem; }
-  .result-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-  .result-item label { font-size: 11px; color: #7a82a0; display: block; margin-bottom: 3px; }
-  .result-item span { font-size: 16px; font-weight: 500; color: #1a1a2e; }
-  .result-item.full { grid-column: 1 / -1; }
-  .error { background: #fff2f2; border: 1px solid #ffc5c5; color: #b00; border-radius: 8px; padding: 10px 14px; margin-top: 1rem; font-size: 14px; }
-  .success { background: #f0fff4; border: 1px solid #b2dfdb; color: #1b5e20; border-radius: 8px; padding: 10px 14px; margin-top: 1rem; font-size: 14px; }
-  .info { background: #e8f0fe; border: 1px solid #b8ccf8; color: #1a3a8f; border-radius: 8px; padding: 10px 14px; font-size: 13px; }
-  .warning { background: #fff8e1; border: 1px solid #ffe082; color: #7a5800; border-radius: 8px; padding: 10px 14px; font-size: 13px; }
-  .loading { color: #5a6690; font-size: 14px; margin-top: 1rem; display: flex; align-items: center; gap: 8px; }
-  .spinner { width: 16px; height: 16px; border: 2px solid #c5d0f5; border-top-color: #0a2463; border-radius: 50%; animation: spin 0.8s linear infinite; flex-shrink: 0; }
-  @keyframes spin { to { transform: rotate(360deg); } }
-  .db-status { font-size: 12px; color: #7a82a0; margin-top: 0.5rem; }
-  .db-status span { font-weight: 500; color: #0a2463; }
-  .overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.4); z-index: 100; align-items: center; justify-content: center; }
-  .overlay.show { display: flex; }
-  .modal { background: #fff; border-radius: 14px; padding: 1.5rem; width: 90%; max-width: 500px; max-height: 90vh; overflow-y: auto; }
-  .modal h3 { font-size: 16px; font-weight: 600; margin-bottom: 0.25rem; color: #1a1a2e; }
-  .modal-sub { font-size: 12px; color: #7a82a0; margin-bottom: 1rem; }
-  .modal-btns { display: flex; gap: 10px; margin-top: 1rem; justify-content: flex-end; }
-  .tag { display: inline-block; background: #e8edf8; color: #0a2463; font-size: 13px; padding: 2px 10px; border-radius: 4px; font-weight: 600; }
-  .note { font-size: 12px; color: #7a82a0; margin-top: 10px; font-style: italic; }
-  .progress-wrap { margin-top: 1rem; }
-  .progress-label { font-size: 13px; color: #5a6690; margin-bottom: 6px; display: flex; justify-content: space-between; }
-  .progress-bar-bg { background: #e2e8f8; border-radius: 20px; height: 10px; overflow: hidden; }
-  .progress-bar-fill { background: #0a2463; height: 10px; border-radius: 20px; transition: width 0.3s ease; }
-  .map-thumb { width: 100%; height: 180px; border-radius: 8px; border: 1px solid #c5d0f5; margin-top: 8px; overflow: hidden; }
-  .map-thumb iframe { width: 100%; height: 100%; border: none; }
-  .init-status { text-align: center; padding: 2rem 1rem; color: #5a6690; font-size: 14px; }
-  .init-spinner { width: 32px; height: 32px; border: 3px solid #c5d0f5; border-top-color: #0a2463; border-radius: 50%; animation: spin 0.8s linear infinite; margin: 0 auto 1rem; }
-  .step { display: flex; align-items: flex-start; gap: 12px; padding: 10px 0; border-bottom: 0.5px solid #f0f0f0; }
-  .step:last-child { border-bottom: none; }
-  .step-num { width: 24px; height: 24px; border-radius: 50%; background: #0a2463; color: #fff; font-size: 12px; font-weight: 600; display: flex; align-items: center; justify-content: center; flex-shrink: 0; margin-top: 1px; }
-  .step-text { font-size: 13px; color: #3a3a5c; line-height: 1.5; }
-  .step-text strong { color: #1a1a2e; }
-  hr { border: none; border-top: 0.5px solid #e2e4ea; margin: 1rem 0; }
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f5f6fa;min-height:100vh;}
+.header{background:#0a2463;color:#fff;padding:1rem 1.5rem;display:flex;align-items:center;justify-content:space-between;}
+.header-title{font-size:18px;font-weight:600;}
+.header-sub{font-size:12px;opacity:0.7;margin-top:2px;}
+.admin-btn{background:rgba(255,255,255,0.15);border:1px solid rgba(255,255,255,0.3);color:#fff;padding:6px 14px;border-radius:6px;cursor:pointer;font-size:13px;}
+.admin-btn:hover{background:rgba(255,255,255,0.25);}
+.container{max-width:640px;margin:2rem auto;padding:0 1rem;}
+.card{background:#fff;border-radius:12px;border:0.5px solid #e2e4ea;padding:1.5rem;margin-bottom:1.5rem;}
+.card h2{font-size:15px;font-weight:500;color:#1a1a2e;margin-bottom:1rem;}
+.input-row{display:flex;gap:10px;}
+input[type=text],input[type=password]{flex:1;padding:10px 14px;border:1px solid #dde1ea;border-radius:8px;font-size:15px;outline:none;transition:border 0.2s;}
+input[type=text]:focus,input[type=password]:focus{border-color:#0a2463;}
+.btn{background:#0a2463;color:#fff;border:none;padding:10px 20px;border-radius:8px;font-size:14px;cursor:pointer;font-weight:500;white-space:nowrap;}
+.btn:hover{background:#0d2e7a;}
+.btn:disabled{background:#b0b5c4;cursor:not-allowed;}
+.btn-outline{background:transparent;color:#0a2463;border:1px solid #0a2463;}
+.btn-outline:hover{background:#f0f3ff;}
+.result-card{background:#f0f4ff;border:1px solid #c5d0f5;border-radius:10px;padding:1.25rem;margin-top:1rem;}
+.result-title{font-size:12px;font-weight:600;color:#5a6690;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:0.75rem;}
+.result-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+.result-item label{font-size:11px;color:#7a82a0;display:block;margin-bottom:3px;}
+.result-item span{font-size:16px;font-weight:500;color:#1a1a2e;}
+.result-item.full{grid-column:1/-1;}
+.error{background:#fff2f2;border:1px solid #ffc5c5;color:#b00;border-radius:8px;padding:10px 14px;margin-top:1rem;font-size:14px;}
+.success{background:#f0fff4;border:1px solid #b2dfdb;color:#1b5e20;border-radius:8px;padding:10px 14px;margin-top:1rem;font-size:14px;}
+.info{background:#e8f0fe;border:1px solid #b8ccf8;color:#1a3a8f;border-radius:8px;padding:10px 14px;font-size:13px;}
+.warning{background:#fff8e1;border:1px solid #ffe082;color:#7a5800;border-radius:8px;padding:10px 14px;font-size:13px;}
+.loading{color:#5a6690;font-size:14px;margin-top:1rem;display:flex;align-items:center;gap:8px;}
+.spinner{width:16px;height:16px;border:2px solid #c5d0f5;border-top-color:#0a2463;border-radius:50%;animation:spin 0.8s linear infinite;flex-shrink:0;}
+@keyframes spin{to{transform:rotate(360deg);}}
+.db-status{font-size:12px;color:#7a82a0;margin-top:0.5rem;}
+.db-status span{font-weight:500;color:#0a2463;}
+.overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.4);z-index:100;align-items:center;justify-content:center;}
+.overlay.show{display:flex;}
+.modal{background:#fff;border-radius:14px;padding:1.5rem;width:90%;max-width:500px;max-height:90vh;overflow-y:auto;}
+.modal h3{font-size:16px;font-weight:600;margin-bottom:0.25rem;color:#1a1a2e;}
+.modal-sub{font-size:12px;color:#7a82a0;margin-bottom:1rem;}
+.modal-btns{display:flex;gap:10px;margin-top:1rem;justify-content:flex-end;}
+.tag{display:inline-block;background:#e8edf8;color:#0a2463;font-size:13px;padding:2px 10px;border-radius:4px;font-weight:600;}
+.note{font-size:12px;color:#7a82a0;margin-top:10px;font-style:italic;}
+.progress-wrap{margin-top:1rem;}
+.progress-label{font-size:13px;color:#5a6690;margin-bottom:6px;display:flex;justify-content:space-between;}
+.progress-bar-bg{background:#e2e8f8;border-radius:20px;height:10px;overflow:hidden;}
+.progress-bar-fill{background:#0a2463;height:10px;border-radius:20px;transition:width 0.3s ease;}
+.map-thumb{width:100%;height:180px;border-radius:8px;border:1px solid #c5d0f5;margin-top:8px;overflow:hidden;}
+.map-thumb iframe{width:100%;height:100%;border:none;}
+.init-status{text-align:center;padding:2rem 1rem;color:#5a6690;font-size:14px;}
+.init-spinner{width:32px;height:32px;border:3px solid #c5d0f5;border-top-color:#0a2463;border-radius:50%;animation:spin 0.8s linear infinite;margin:0 auto 1rem;}
+.step{display:flex;align-items:flex-start;gap:12px;padding:10px 0;border-bottom:0.5px solid #f0f0f0;}
+.step:last-child{border-bottom:none;}
+.step-num{width:24px;height:24px;border-radius:50%;background:#0a2463;color:#fff;font-size:12px;font-weight:600;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+.step-text{font-size:13px;color:#3a3a5c;line-height:1.5;}
+.step-text strong{color:#1a1a2e;}
+hr{border:none;border-top:0.5px solid #e2e4ea;margin:1rem 0;}
 </style>
 </head>
 <body>
@@ -74,7 +74,7 @@
 <div class="overlay" id="adminOverlay">
   <div class="modal">
     <h3>Admin login</h3><div class="modal-sub">Jio ESIC PIN Finder</div>
-    <input type="password" id="adminPass" placeholder="Enter admin password" style="width:100%;margin-bottom:8px;" onkeydown="if(event.key==='Enter') doLogin()" />
+    <input type="password" id="adminPass" placeholder="Enter admin password" style="width:100%;margin-bottom:8px;" />
     <div id="loginError" class="error" style="display:none;">Incorrect password.</div>
     <div class="modal-btns"><button class="btn btn-outline" onclick="closeAdminLogin()">Cancel</button><button class="btn" onclick="doLogin()">Login</button></div>
   </div>
@@ -82,15 +82,15 @@
 <div class="overlay" id="adminPanel">
   <div class="modal">
     <h3>Admin panel</h3><div class="modal-sub">Jio ESIC PIN Finder</div>
-    <div class="info" style="margin-bottom:1rem;"><strong>How it works:</strong> Run geocoding once after uploading a new Excel. Download coords.json and upload it to GitHub. All recruiters then load instantly.</div>
+    <div class="info" style="margin-bottom:1rem;"><strong>How it works:</strong> Run geocoding once after uploading a new Excel. Download coords.json and upload it to GitHub. All recruiters load instantly.</div>
     <div id="adminDbInfo" style="font-size:13px;color:#3a3a5c;margin-bottom:1rem;"></div>
     <hr>
     <p style="font-size:13px;font-weight:600;color:#1a1a2e;margin-bottom:0.75rem;">When you update the Excel in GitHub:</p>
     <div class="step"><div class="step-num">1</div><div class="step-text">Upload new <strong>CC Build IDs.xlsx</strong> to GitHub</div></div>
-    <div class="step"><div class="step-num">2</div><div class="step-text">Click <strong>"Run geocoding"</strong> below (~5 mins, one-time)</div></div>
-    <div class="step"><div class="step-num">3</div><div class="step-text"><strong>coords.json</strong> downloads to your computer automatically</div></div>
+    <div class="step"><div class="step-num">2</div><div class="step-text">Click <strong>Run geocoding</strong> below (~5 mins, one-time)</div></div>
+    <div class="step"><div class="step-num">3</div><div class="step-text"><strong>coords.json</strong> downloads to your computer</div></div>
     <div class="step"><div class="step-num">4</div><div class="step-text">Upload <strong>coords.json</strong> to GitHub repo</div></div>
-    <div class="step"><div class="step-num">5</div><div class="step-text">All recruiters load instantly — zero geocoding wait ever</div></div>
+    <div class="step"><div class="step-num">5</div><div class="step-text">All recruiters load instantly — zero wait ever</div></div>
     <hr>
     <div id="geocodeStatus"></div>
     <div id="geocodeProgress" style="display:none;" class="progress-wrap">
@@ -104,109 +104,138 @@
   </div>
 </div>
 <script>
-const ADMIN_PASS='Jio@2026';
-const EXCEL_URL='https://raw.githubusercontent.com/nileshsalunke1324/jio-esic-finder/main/CC%20Build%20IDs.xlsx';
-const COORDS_URL='https://raw.githubusercontent.com/nileshsalunke1324/jio-esic-finder/main/coords.json';
-const LS_EMP='jio_esic_v6_emp';
-let esicData=[],empCache={};
-function lsSet(k,v){try{localStorage.setItem(k,JSON.stringify(v));return true;}catch(e){return false;}}
-function lsGet(k){try{const v=localStorage.getItem(k);return v?JSON.parse(v):null;}catch(e){return null;}}
-function toRad(d){return d*Math.PI/180;}
-function haversine(la1,lo1,la2,lo2){const R=6371,dLa=toRad(la2-la1),dLo=toRad(lo2-lo1),a=Math.sin(dLa/2)**2+Math.cos(toRad(la1))*Math.cos(toRad(la2))*Math.sin(dLo/2)**2;return R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));}
-function delay(ms){return new Promise(r=>setTimeout(r,ms));}
-function fetchWithTimeout(url,ms){
-  const ctrl=new AbortController();
-  const id=setTimeout(()=>ctrl.abort(),ms);
-  return fetch(url,{signal:ctrl.signal}).finally(()=>clearTimeout(id));
+var ADMIN='Jio@2026';
+var EXURL='https://raw.githubusercontent.com/nileshsalunke1324/jio-esic-finder/main/CC%20Build%20IDs.xlsx';
+var COURL='https://raw.githubusercontent.com/nileshsalunke1324/jio-esic-finder/main/coords.json';
+var LEMP='jio_esic_v7_emp';
+var esicData=[],empCache={};
+function lsS(k,v){try{localStorage.setItem(k,JSON.stringify(v));}catch(e){}}
+function lsG(k){try{var v=localStorage.getItem(k);return v?JSON.parse(v):null;}catch(e){return null;}}
+function rad(d){return d*Math.PI/180;}
+function hav(a,b,c,d){var R=6371,da=rad(c-a),db=rad(d-b),x=Math.sin(da/2)*Math.sin(da/2)+Math.cos(rad(a))*Math.cos(rad(c))*Math.sin(db/2)*Math.sin(db/2);return R*2*Math.atan2(Math.sqrt(x),Math.sqrt(1-x));}
+function wait(ms){return new Promise(function(r){setTimeout(r,ms);});}
+function ft(url,ms){var c=new AbortController(),id=setTimeout(function(){c.abort();},ms);return fetch(url,{signal:c.signal}).finally(function(){clearTimeout(id);});}
+function ngeo(pin){
+  return ft('https://nominatim.openstreetmap.org/search?postalcode='+encodeURIComponent(pin)+'&countrycodes=in&format=json&limit=1',6000)
+    .then(function(r){return r.ok?r.json():[];})
+    .then(function(d){return d&&d.length?{lat:parseFloat(d[0].lat),lon:parseFloat(d[0].lon)}:null;})
+    .catch(function(){
+      return ft('https://photon.komoot.io/api/?q='+encodeURIComponent(pin+' India')+'&limit=1&lang=en',6000)
+        .then(function(r){return r.ok?r.json():{features:[]};})
+        .then(function(d){if(d.features&&d.features.length){var c=d.features[0].geometry.coordinates;return{lat:c[1],lon:c[0]};}return null;})
+        .catch(function(){return null;});
+    });
 }
-async function nominatimGeocode(pin){
-  try{const r=await fetchWithTimeout('https://nominatim.openstreetmap.org/search?postalcode='+encodeURIComponent(pin)+'&countrycodes=in&format=json&limit=1',5000);if(r.ok){const d=await r.json();if(d&&d.length)return{lat:parseFloat(d[0].lat),lon:parseFloat(d[0].lon)};}}catch(e){}
-  try{const r=await fetchWithTimeout('https://photon.komoot.io/api/?q='+encodeURIComponent(pin+' India')+'&limit=1&lang=en',5000);if(r.ok){const d=await r.json();if(d.features&&d.features.length){const[lon,lat]=d.features[0].geometry.coordinates;return{lat,lon};}}}catch(e){}
-  return null;
+function osrm(la1,lo1,la2,lo2){
+  return ft('https://router.project-osrm.org/route/v1/driving/'+lo1+','+la1+';'+lo2+','+la2+'?overview=false',6000)
+    .then(function(r){return r.json();})
+    .then(function(d){return d.code==='Ok'&&d.routes.length?d.routes[0].distance/1000:null;})
+    .catch(function(){return null;});
 }
-async function osrmDistance(la1,lo1,la2,lo2){try{const r=await fetchWithTimeout('https://router.project-osrm.org/route/v1/driving/'+lo1+','+la1+';'+lo2+','+la2+'?overview=false',6000);const d=await r.json();if(d.code==='Ok'&&d.routes.length)return d.routes[0].distance/1000;}catch(e){}return null;}
-async function fetchExcel(){
-  const r=await fetchWithTimeout(EXCEL_URL+'?t='+Date.now(),10000);
-  if(!r.ok)throw new Error('Could not fetch Excel ('+r.status+')');
-  const wb=XLSX.read(await r.arrayBuffer(),{type:'array'});const ws=wb.Sheets[wb.SheetNames[0]];
-  const rows=XLSX.utils.sheet_to_json(ws,{defval:''});const out=[];
-  for(const row of rows){const keys=Object.keys(row),sk=keys.find(k=>k.toLowerCase().includes('state')),ck=keys.find(k=>k.toLowerCase().includes('city')),pk=keys.find(k=>k.toLowerCase().includes('pin')),bk=keys.find(k=>k.toLowerCase().includes('build'));if(!pk||!bk)continue;const pin=String(row[pk]).trim(),buildId=String(row[bk]).trim();if(/^d{6}$/.test(pin)&&buildId)out.push({state:sk?String(row[sk]).trim():'',city:ck?String(row[ck]).trim():'',pin,buildId,lat:null,lon:null});}
-  return out;
+function loadExcel(){
+  return ft(EXURL+'?t='+Date.now(),10000)
+    .then(function(r){if(!r.ok)throw new Error('Excel fetch failed ('+r.status+')');return r.arrayBuffer();})
+    .then(function(buf){
+      var wb=XLSX.read(buf,{type:'array'}),ws=wb.Sheets[wb.SheetNames[0]],rows=XLSX.utils.sheet_to_json(ws,{defval:''}),out=[];
+      rows.forEach(function(row){
+        var keys=Object.keys(row);
+        var pk=keys.find(function(k){return k.toLowerCase().indexOf('pin')>=0;});
+        var bk=keys.find(function(k){return k.toLowerCase().indexOf('build')>=0;});
+        var sk=keys.find(function(k){return k.toLowerCase().indexOf('state')>=0;});
+        var ck=keys.find(function(k){return k.toLowerCase().indexOf('city')>=0;});
+        if(!pk||!bk)return;
+        var pin=String(row[pk]).trim(),bid=String(row[bk]).trim();
+        if(/^[0-9]{6}$/.test(pin)&&bid)out.push({state:sk?String(row[sk]).trim():'',city:ck?String(row[ck]).trim():'',pin:pin,buildId:bid,lat:null,lon:null});
+      });
+      return out;
+    });
 }
-async function fetchCoords(){
-  try{
-    const r=await fetchWithTimeout(COORDS_URL+'?t='+Date.now(),5000);
-    if(r.ok)return await r.json();
-  }catch(e){}
-  return null;
+function loadCoords(){
+  return ft(COURL+'?t='+Date.now(),5000).then(function(r){return r.ok?r.json():null;}).catch(function(){return null;});
 }
-function mergeCoords(fac,cm){return fac.map(f=>({...f,...(cm&&cm[f.pin]?cm[f.pin]:{})}));}
-async function init(){
-  empCache=lsGet(LS_EMP)||{};
+function merge(fac,cm){return fac.map(function(f){return cm&&cm[f.pin]?Object.assign({},f,cm[f.pin]):f;});}
+function init(){
+  empCache=lsG(LEMP)||{};
   document.getElementById('mainCard').innerHTML='<div class="init-status"><div class="init-spinner"></div>Loading ESIC database...</div>';
-  try{
-    const[rawData,coordsMap]=await Promise.all([fetchExcel(),fetchCoords()]);
-    if(!rawData.length)throw new Error('No valid data found in Excel file.');
-    esicData=mergeCoords(rawData,coordsMap);
-    showSearchUI(esicData.filter(f=>f.lat!=null).length);
-  }catch(err){
+  Promise.all([loadExcel(),loadCoords()]).then(function(res){
+    var raw=res[0],cm=res[1];
+    if(!raw.length)throw new Error('No valid data in Excel file.');
+    esicData=merge(raw,cm);
+    showUI(esicData.filter(function(f){return f.lat!=null;}).length);
+  }).catch(function(err){
     document.getElementById('mainCard').innerHTML='<div class="error">Failed to load: '+err.message+'<br><br><button class="btn" onclick="init()" style="margin-top:8px;">Retry</button></div>';
-  }
+  });
 }
-function showSearchUI(geocoded){
-  const total=esicData.length;
-  const warn=geocoded===0
-    ?'<div class="warning" style="margin-top:0.75rem;">&#9888; No coordinates loaded yet. Admin: please run geocoding and upload coords.json to GitHub.</div>'
-    :geocoded<total
-    ?'<div class="warning" style="margin-top:0.75rem;">&#9888; '+geocoded+' of '+total+' facilities geocoded. Admin should re-run geocoding.</div>'
-    :'';
-  document.getElementById('mainCard').innerHTML='<h2>Enter employee PIN code</h2><div class="input-row"><input type="text" id="empPin" placeholder="e.g. 400072" maxlength="6" oninput="this.value=this.value.replace(/\D/g,'')" onkeydown="if(event.key==='Enter') findNearest()" /><button class="btn" onclick="findNearest()" id="searchBtn">Find nearest</button></div><div class="db-status">Database: <span>'+total+' ESIC facilities</span> &nbsp;|&nbsp; <span>'+geocoded+' geocoded</span></div>'+warn+'<div id="resultArea"></div>';
+function showUI(g){
+  var t=esicData.length;
+  var w=g===0?'<div class="warning" style="margin-top:0.75rem;">No coordinates yet. Admin: run geocoding and upload coords.json to GitHub.</div>':g<t?'<div class="warning" style="margin-top:0.75rem;">Only '+g+' of '+t+' geocoded. Admin should re-run geocoding.</div>':'';
+  var mc=document.getElementById('mainCard');
+  mc.innerHTML='<h2>Enter employee PIN code</h2><div class="input-row"><input type="text" id="empPin" placeholder="e.g. 400072" maxlength="6" /><button class="btn" id="searchBtn" onclick="findNearest()">Find nearest</button></div><div class="db-status">Database: <span>'+t+' ESIC facilities</span> &nbsp;|&nbsp; <span>'+g+' geocoded</span></div>'+w+'<div id="resultArea"></div>';
+  document.getElementById('empPin').addEventListener('input',function(){this.value=this.value.replace(/[^0-9]/g,'');});
+  document.getElementById('empPin').addEventListener('keydown',function(e){if(e.key==='Enter')findNearest();});
 }
-async function findNearest(){
-  const pin=document.getElementById('empPin').value.trim(),area=document.getElementById('resultArea');
+function findNearest(){
+  var pin=document.getElementById('empPin').value.trim();
+  var area=document.getElementById('resultArea');
   if(pin.length!==6){area.innerHTML='<div class="error">Please enter a valid 6-digit PIN code.</div>';return;}
-  const gf=esicData.filter(f=>f.lat!=null);
+  var gf=esicData.filter(function(f){return f.lat!=null;});
   if(!gf.length){area.innerHTML='<div class="warning">No geocoded facilities. Ask admin to run geocoding and upload coords.json.</div>';return;}
   document.getElementById('searchBtn').disabled=true;
   area.innerHTML='<div class="loading"><div class="spinner"></div> Locating employee PIN code...</div>';
-  try{
-    let emp=empCache[pin];
-    if(!emp){emp=await nominatimGeocode(pin);if(!emp){area.innerHTML='<div class="error">Could not locate PIN '+pin+'. Please verify and try again.</div>';document.getElementById('searchBtn').disabled=false;return;}empCache[pin]=emp;lsSet(LS_EMP,empCache);}
-    const sorted=gf.map(f=>({...f,straight:haversine(emp.lat,emp.lon,f.lat,f.lon)})).sort((a,b)=>a.straight-b.straight).slice(0,6);
+  var emp=empCache[pin];
+  var empP=emp?Promise.resolve(emp):ngeo(pin).then(function(e){if(!e)throw new Error('Could not locate PIN '+pin);empCache[pin]=e;lsS(LEMP,empCache);return e;});
+  empP.then(function(emp){
+    var sorted=gf.map(function(f){return Object.assign({},f,{st:hav(emp.lat,emp.lon,f.lat,f.lon)});}).sort(function(a,b){return a.st-b.st;}).slice(0,6);
     area.innerHTML='<div class="loading"><div class="spinner"></div> Calculating road distances...</div>';
-    const wr=[];for(const f of sorted){const km=await osrmDistance(emp.lat,emp.lon,f.lat,f.lon);wr.push({...f,roadKm:km!==null?km:f.straight,isRoad:km!==null});await delay(200);}
-    wr.sort((a,b)=>a.roadKm-b.roadKm);const b=wr[0];
-    const dl=b.roadKm<1?(b.roadKm*1000).toFixed(0)+' m':b.roadKm.toFixed(1)+' km',dn=b.isRoad?'by road':'straight-line estimate';
-    const mu='https://www.openstreetmap.org/export/embed.html?bbox='+(b.lon-0.05).toFixed(4)+','+(b.lat-0.05).toFixed(4)+','+(b.lon+0.05).toFixed(4)+','+(b.lat+0.05).toFixed(4)+'&layer=mapnik&marker='+b.lat.toFixed(4)+','+b.lon.toFixed(4);
-    area.innerHTML='<div class="result-card"><div class="result-title">Nearest ESIC facility</div><div class="result-grid"><div class="result-item"><label>ESIC PIN code</label><span>'+b.pin+'</span></div><div class="result-item"><label>Final Build ID</label><span class="tag">'+b.buildId+'</span></div><div class="result-item"><label>City</label><span>'+b.city+'</span></div><div class="result-item"><label>State</label><span>'+b.state+'</span></div><div class="result-item full"><label>Distance from employee PIN '+pin+'</label><div style="margin-top:4px;"><span style="font-size:22px;font-weight:600;color:#0a2463;">'+dl+'</span><span style="font-size:13px;color:#5a6690;margin-left:6px;">'+dn+'</span></div></div><div class="result-item full"><label>Facility location</label><div class="map-thumb"><iframe src="'+mu+'" loading="lazy"></iframe></div></div></div><p class="note">Road distance via OpenStreetMap routing.</p></div>';
-  }catch(e){area.innerHTML='<div class="error">Error: '+e.message+'</div>';}
-  document.getElementById('searchBtn').disabled=false;
+    var chain=Promise.resolve([]);
+    sorted.forEach(function(f){chain=chain.then(function(wr){return wait(200).then(function(){return osrm(emp.lat,emp.lon,f.lat,f.lon);}).then(function(km){wr.push(Object.assign({},f,{rk:km!=null?km:f.st,ir:km!=null}));return wr;});});});
+    return chain.then(function(wr){
+      wr.sort(function(a,b){return a.rk-b.rk;});
+      var b=wr[0];
+      var dl=b.rk<1?(b.rk*1000).toFixed(0)+' m':b.rk.toFixed(1)+' km';
+      var dn=b.ir?'by road':'straight-line estimate';
+      var mu='https://www.openstreetmap.org/export/embed.html?bbox='+(b.lon-0.05).toFixed(4)+','+(b.lat-0.05).toFixed(4)+','+(b.lon+0.05).toFixed(4)+','+(b.lat+0.05).toFixed(4)+'&layer=mapnik&marker='+b.lat.toFixed(4)+','+b.lon.toFixed(4);
+      area.innerHTML='<div class="result-card"><div class="result-title">Nearest ESIC facility</div><div class="result-grid"><div class="result-item"><label>ESIC PIN code</label><span>'+b.pin+'</span></div><div class="result-item"><label>Final Build ID</label><span class="tag">'+b.buildId+'</span></div><div class="result-item"><label>City</label><span>'+b.city+'</span></div><div class="result-item"><label>State</label><span>'+b.state+'</span></div><div class="result-item full"><label>Distance from employee PIN '+pin+'</label><div style="margin-top:4px"><span style="font-size:22px;font-weight:600;color:#0a2463">'+dl+'</span><span style="font-size:13px;color:#5a6690;margin-left:6px">'+dn+'</span></div></div><div class="result-item full"><label>Facility location</label><div class="map-thumb"><iframe src="'+mu+'" loading="lazy"></iframe></div></div></div><p class="note">Road distance via OpenStreetMap routing.</p></div>';
+      document.getElementById('searchBtn').disabled=false;
+    });
+  }).catch(function(e){area.innerHTML='<div class="error">'+e.message+'</div>';document.getElementById('searchBtn').disabled=false;});
 }
-function showAdminLogin(){document.getElementById('adminOverlay').classList.add('show');setTimeout(()=>document.getElementById('adminPass').focus(),100);}
+function showAdminLogin(){document.getElementById('adminOverlay').classList.add('show');setTimeout(function(){document.getElementById('adminPass').focus();},100);}
 function closeAdminLogin(){document.getElementById('adminOverlay').classList.remove('show');document.getElementById('adminPass').value='';document.getElementById('loginError').style.display='none';}
-function doLogin(){if(document.getElementById('adminPass').value===ADMIN_PASS){closeAdminLogin();const g=esicData.filter(f=>f.lat!=null).length;document.getElementById('adminDbInfo').innerHTML='<strong>Facilities:</strong> '+esicData.length+' &nbsp;|&nbsp; <strong>Geocoded:</strong> '+g+(g===esicData.length?' ✅':' ⚠️ needs geocoding');document.getElementById('adminPanel').classList.add('show');}else{document.getElementById('loginError').style.display='block';}}
+function doLogin(){if(document.getElementById('adminPass').value===ADMIN){closeAdminLogin();var g=esicData.filter(function(f){return f.lat!=null;}).length;document.getElementById('adminDbInfo').innerHTML='<strong>Facilities:</strong> '+esicData.length+' &nbsp;|&nbsp; <strong>Geocoded:</strong> '+g+(g===esicData.length?' ✅':' ⚠️');document.getElementById('adminPanel').classList.add('show');}else{document.getElementById('loginError').style.display='block';}}
 function closeAdminPanel(){document.getElementById('adminPanel').classList.remove('show');document.getElementById('geocodeStatus').innerHTML='';document.getElementById('geocodeProgress').style.display='none';document.getElementById('runGeoBtn').disabled=false;}
-async function runGeocoding(){
-  const btn=document.getElementById('runGeoBtn'),se=document.getElementById('geocodeStatus'),pe=document.getElementById('geocodeProgress');
+function runGeocoding(){
+  var btn=document.getElementById('runGeoBtn'),se=document.getElementById('geocodeStatus'),pe=document.getElementById('geocodeProgress');
   btn.disabled=true;pe.style.display='block';
-  se.innerHTML='<div class="info" style="margin-bottom:0.5rem;">Fetching latest Excel from GitHub...</div>';
-  try{
-    const rawData=await fetchExcel();if(!rawData.length)throw new Error('No data in Excel.');
-    const up=[...new Set(rawData.map(f=>f.pin))];
-    const cm={};for(const f of esicData){if(f.lat!=null)cm[f.pin]={lat:f.lat,lon:f.lon};}
+  se.innerHTML='<div class="info" style="margin-bottom:0.5rem;">Fetching latest Excel...</div>';
+  loadExcel().then(function(raw){
+    if(!raw.length)throw new Error('No data in Excel.');
+    var up=[...new Set(raw.map(function(f){return f.pin;}))];
+    var cm={};
+    esicData.forEach(function(f){if(f.lat!=null)cm[f.pin]={lat:f.lat,lon:f.lon};});
     se.innerHTML='<div class="info" style="margin-bottom:0.5rem;">Geocoding '+up.length+' PIN codes. Do not close this window.</div>';
-    updGeo(0,up.length);
-    for(let i=0;i<up.length;i++){if(!cm[up[i]]){const c=await nominatimGeocode(up[i]);if(c)cm[up[i]]=c;}updGeo(i+1,up.length);await delay(1200);}
-    esicData=mergeCoords(rawData,cm);
-    const blob=new Blob([JSON.stringify(cm,null,2)],{type:'application/json'});
-    const a=Object.assign(document.createElement('a'),{href:URL.createObjectURL(blob),download:'coords.json'});
-    a.click();URL.revokeObjectURL(a.href);
-    updGeo(up.length,up.length,'Done!');
-    const gc=Object.keys(cm).length;
-    se.innerHTML='<div class="success" style="margin-bottom:0.75rem;">✅ Geocoded '+gc+' of '+up.length+' PIN codes. <strong>coords.json downloaded.</strong></div><div class="info"><strong>Next step:</strong> Upload coords.json to your GitHub repo. All recruiters will load instantly.</div>';
-    showSearchUI(esicData.filter(f=>f.lat!=null).length);
-  }catch(err){se.innerHTML='<div class="error">Error: '+err.message+'</div>';btn.disabled=false;}
+    upd(0,up.length);
+    var i=0;
+    function next(){
+      if(i>=up.length){
+        esicData=merge(raw,cm);
+        var blob=new Blob([JSON.stringify(cm,null,2)],{type:'application/json'});
+        var a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='coords.json';a.click();URL.revokeObjectURL(a.href);
+        upd(up.length,up.length,'Done!');
+        var gc=Object.keys(cm).length;
+        se.innerHTML='<div class="success" style="margin-bottom:0.75rem;">✅ Geocoded '+gc+' of '+up.length+'. <strong>coords.json downloaded.</strong></div><div class="info"><strong>Next:</strong> Upload coords.json to GitHub repo.</div>';
+        showUI(esicData.filter(function(f){return f.lat!=null;}).length);
+        return;
+      }
+      var pin=up[i];
+      var p=cm[pin]?Promise.resolve(null):ngeo(pin).then(function(c){if(c)cm[pin]=c;});
+      p.then(function(){i++;upd(i,up.length);return wait(1200);}).then(next).catch(function(){i++;upd(i,up.length);return wait(1200).then(next);});
+    }
+    next();
+  }).catch(function(err){se.innerHTML='<div class="error">Error: '+err.message+'</div>';btn.disabled=false;});
 }
-function updGeo(d,t,l){const p=Math.round((d/t)*100);document.getElementById('gFill').style.width=p+'%';document.getElementById('gPct').textContent=p+'%';document.getElementById('gText').textContent=l||(d===t?'Complete!':'Geocoding '+d+' of '+t+'...');}
+function upd(d,t,l){var p=Math.round(d/t*100);document.getElementById('gFill').style.width=p+'%';document.getElementById('gPct').textContent=p+'%';document.getElementById('gText').textContent=l||(d===t?'Complete!':'Geocoding '+d+' of '+t+'...');}
 init();
-</script></body></html>
+</script>
+</body>
+</html>
