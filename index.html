@@ -82,15 +82,15 @@
 <div class="overlay" id="adminPanel">
   <div class="modal">
     <h3>Admin panel</h3><div class="modal-sub">Jio ESIC PIN Finder</div>
-    <div class="info" style="margin-bottom:1rem;"><strong>How it works:</strong> When you upload a new Excel to GitHub, run geocoding once from here. Download the <code>coords.json</code> file and upload it to GitHub. All recruiters then load instantly — no geocoding ever.</div>
+    <div class="info" style="margin-bottom:1rem;"><strong>How it works:</strong> Run geocoding once after uploading a new Excel. Download coords.json and upload it to GitHub. All recruiters then load instantly.</div>
     <div id="adminDbInfo" style="font-size:13px;color:#3a3a5c;margin-bottom:1rem;"></div>
     <hr>
     <p style="font-size:13px;font-weight:600;color:#1a1a2e;margin-bottom:0.75rem;">When you update the Excel in GitHub:</p>
-    <div class="step"><div class="step-num">1</div><div class="step-text">Upload new <strong>CC Build IDs.xlsx</strong> to GitHub repo</div></div>
+    <div class="step"><div class="step-num">1</div><div class="step-text">Upload new <strong>CC Build IDs.xlsx</strong> to GitHub</div></div>
     <div class="step"><div class="step-num">2</div><div class="step-text">Click <strong>"Run geocoding"</strong> below (~5 mins, one-time)</div></div>
-    <div class="step"><div class="step-num">3</div><div class="step-text"><strong>coords.json</strong> downloads automatically to your computer</div></div>
-    <div class="step"><div class="step-num">4</div><div class="step-text">Upload <strong>coords.json</strong> to GitHub repo (same folder as index.html)</div></div>
-    <div class="step"><div class="step-num">5</div><div class="step-text">Done — all recruiters load instantly, zero geocoding wait</div></div>
+    <div class="step"><div class="step-num">3</div><div class="step-text"><strong>coords.json</strong> downloads to your computer automatically</div></div>
+    <div class="step"><div class="step-num">4</div><div class="step-text">Upload <strong>coords.json</strong> to GitHub repo</div></div>
+    <div class="step"><div class="step-num">5</div><div class="step-text">All recruiters load instantly — zero geocoding wait ever</div></div>
     <hr>
     <div id="geocodeStatus"></div>
     <div id="geocodeProgress" style="display:none;" class="progress-wrap">
@@ -114,34 +114,52 @@ function lsGet(k){try{const v=localStorage.getItem(k);return v?JSON.parse(v):nul
 function toRad(d){return d*Math.PI/180;}
 function haversine(la1,lo1,la2,lo2){const R=6371,dLa=toRad(la2-la1),dLo=toRad(lo2-lo1),a=Math.sin(dLa/2)**2+Math.cos(toRad(la1))*Math.cos(toRad(la2))*Math.sin(dLo/2)**2;return R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));}
 function delay(ms){return new Promise(r=>setTimeout(r,ms));}
+function fetchWithTimeout(url,ms){
+  const ctrl=new AbortController();
+  const id=setTimeout(()=>ctrl.abort(),ms);
+  return fetch(url,{signal:ctrl.signal}).finally(()=>clearTimeout(id));
+}
 async function nominatimGeocode(pin){
-  try{const r=await fetch('https://nominatim.openstreetmap.org/search?postalcode='+encodeURIComponent(pin)+'&countrycodes=in&format=json&limit=1');if(r.ok){const d=await r.json();if(d&&d.length)return{lat:parseFloat(d[0].lat),lon:parseFloat(d[0].lon)};}}catch(e){}
-  try{const r=await fetch('https://photon.komoot.io/api/?q='+encodeURIComponent(pin+' India')+'&limit=1&lang=en');if(r.ok){const d=await r.json();if(d.features&&d.features.length){const[lon,lat]=d.features[0].geometry.coordinates;return{lat,lon};}}}catch(e){}
+  try{const r=await fetchWithTimeout('https://nominatim.openstreetmap.org/search?postalcode='+encodeURIComponent(pin)+'&countrycodes=in&format=json&limit=1',5000);if(r.ok){const d=await r.json();if(d&&d.length)return{lat:parseFloat(d[0].lat),lon:parseFloat(d[0].lon)};}}catch(e){}
+  try{const r=await fetchWithTimeout('https://photon.komoot.io/api/?q='+encodeURIComponent(pin+' India')+'&limit=1&lang=en',5000);if(r.ok){const d=await r.json();if(d.features&&d.features.length){const[lon,lat]=d.features[0].geometry.coordinates;return{lat,lon};}}}catch(e){}
   return null;
 }
-async function osrmDistance(la1,lo1,la2,lo2){try{const r=await fetch('https://router.project-osrm.org/route/v1/driving/'+lo1+','+la1+';'+lo2+','+la2+'?overview=false');const d=await r.json();if(d.code==='Ok'&&d.routes.length)return d.routes[0].distance/1000;}catch(e){}return null;}
+async function osrmDistance(la1,lo1,la2,lo2){try{const r=await fetchWithTimeout('https://router.project-osrm.org/route/v1/driving/'+lo1+','+la1+';'+lo2+','+la2+'?overview=false',6000);const d=await r.json();if(d.code==='Ok'&&d.routes.length)return d.routes[0].distance/1000;}catch(e){}return null;}
 async function fetchExcel(){
-  const r=await fetch(EXCEL_URL+'?t='+Date.now());if(!r.ok)throw new Error('Could not fetch Excel ('+r.status+')');
+  const r=await fetchWithTimeout(EXCEL_URL+'?t='+Date.now(),10000);
+  if(!r.ok)throw new Error('Could not fetch Excel ('+r.status+')');
   const wb=XLSX.read(await r.arrayBuffer(),{type:'array'});const ws=wb.Sheets[wb.SheetNames[0]];
   const rows=XLSX.utils.sheet_to_json(ws,{defval:''});const out=[];
   for(const row of rows){const keys=Object.keys(row),sk=keys.find(k=>k.toLowerCase().includes('state')),ck=keys.find(k=>k.toLowerCase().includes('city')),pk=keys.find(k=>k.toLowerCase().includes('pin')),bk=keys.find(k=>k.toLowerCase().includes('build'));if(!pk||!bk)continue;const pin=String(row[pk]).trim(),buildId=String(row[bk]).trim();if(/^d{6}$/.test(pin)&&buildId)out.push({state:sk?String(row[sk]).trim():'',city:ck?String(row[ck]).trim():'',pin,buildId,lat:null,lon:null});}
   return out;
 }
-async function fetchCoords(){try{const r=await fetch(COORDS_URL+'?t='+Date.now());if(r.ok)return await r.json();}catch(e){}return null;}
+async function fetchCoords(){
+  try{
+    const r=await fetchWithTimeout(COORDS_URL+'?t='+Date.now(),5000);
+    if(r.ok)return await r.json();
+  }catch(e){}
+  return null;
+}
 function mergeCoords(fac,cm){return fac.map(f=>({...f,...(cm&&cm[f.pin]?cm[f.pin]:{})}));}
 async function init(){
   empCache=lsGet(LS_EMP)||{};
   document.getElementById('mainCard').innerHTML='<div class="init-status"><div class="init-spinner"></div>Loading ESIC database...</div>';
   try{
     const[rawData,coordsMap]=await Promise.all([fetchExcel(),fetchCoords()]);
-    if(!rawData.length)throw new Error('No valid data in Excel file.');
+    if(!rawData.length)throw new Error('No valid data found in Excel file.');
     esicData=mergeCoords(rawData,coordsMap);
     showSearchUI(esicData.filter(f=>f.lat!=null).length);
-  }catch(err){document.getElementById('mainCard').innerHTML='<div class="error">Failed to load: '+err.message+'<br><br><button class="btn" onclick="init()" style="margin-top:8px;">Retry</button></div>';}
+  }catch(err){
+    document.getElementById('mainCard').innerHTML='<div class="error">Failed to load: '+err.message+'<br><br><button class="btn" onclick="init()" style="margin-top:8px;">Retry</button></div>';
+  }
 }
 function showSearchUI(geocoded){
   const total=esicData.length;
-  const warn=geocoded===0?'<div class="warning" style="margin-top:0.75rem;">No coordinates loaded. Admin must run geocoding and upload coords.json to GitHub.</div>':geocoded<total?'<div class="warning" style="margin-top:0.75rem;">Only '+geocoded+' of '+total+' facilities geocoded. Admin should re-run geocoding.</div>':'';
+  const warn=geocoded===0
+    ?'<div class="warning" style="margin-top:0.75rem;">&#9888; No coordinates loaded yet. Admin: please run geocoding and upload coords.json to GitHub.</div>'
+    :geocoded<total
+    ?'<div class="warning" style="margin-top:0.75rem;">&#9888; '+geocoded+' of '+total+' facilities geocoded. Admin should re-run geocoding.</div>'
+    :'';
   document.getElementById('mainCard').innerHTML='<h2>Enter employee PIN code</h2><div class="input-row"><input type="text" id="empPin" placeholder="e.g. 400072" maxlength="6" oninput="this.value=this.value.replace(/\D/g,'')" onkeydown="if(event.key==='Enter') findNearest()" /><button class="btn" onclick="findNearest()" id="searchBtn">Find nearest</button></div><div class="db-status">Database: <span>'+total+' ESIC facilities</span> &nbsp;|&nbsp; <span>'+geocoded+' geocoded</span></div>'+warn+'<div id="resultArea"></div>';
 }
 async function findNearest(){
@@ -153,7 +171,7 @@ async function findNearest(){
   area.innerHTML='<div class="loading"><div class="spinner"></div> Locating employee PIN code...</div>';
   try{
     let emp=empCache[pin];
-    if(!emp){emp=await nominatimGeocode(pin);if(!emp){area.innerHTML='<div class="error">Could not locate PIN '+pin+'.</div>';document.getElementById('searchBtn').disabled=false;return;}empCache[pin]=emp;lsSet(LS_EMP,empCache);}
+    if(!emp){emp=await nominatimGeocode(pin);if(!emp){area.innerHTML='<div class="error">Could not locate PIN '+pin+'. Please verify and try again.</div>';document.getElementById('searchBtn').disabled=false;return;}empCache[pin]=emp;lsSet(LS_EMP,empCache);}
     const sorted=gf.map(f=>({...f,straight:haversine(emp.lat,emp.lon,f.lat,f.lon)})).sort((a,b)=>a.straight-b.straight).slice(0,6);
     area.innerHTML='<div class="loading"><div class="spinner"></div> Calculating road distances...</div>';
     const wr=[];for(const f of sorted){const km=await osrmDistance(emp.lat,emp.lon,f.lat,f.lon);wr.push({...f,roadKm:km!==null?km:f.straight,isRoad:km!==null});await delay(200);}
@@ -185,7 +203,7 @@ async function runGeocoding(){
     a.click();URL.revokeObjectURL(a.href);
     updGeo(up.length,up.length,'Done!');
     const gc=Object.keys(cm).length;
-    se.innerHTML='<div class="success" style="margin-bottom:0.75rem;">✅ Geocoded '+gc+' of '+up.length+' PIN codes.<br><strong>coords.json downloaded.</strong></div><div class="info"><strong>Next step:</strong> Upload coords.json to your GitHub repo. All recruiters will load instantly.</div>';
+    se.innerHTML='<div class="success" style="margin-bottom:0.75rem;">✅ Geocoded '+gc+' of '+up.length+' PIN codes. <strong>coords.json downloaded.</strong></div><div class="info"><strong>Next step:</strong> Upload coords.json to your GitHub repo. All recruiters will load instantly.</div>';
     showSearchUI(esicData.filter(f=>f.lat!=null).length);
   }catch(err){se.innerHTML='<div class="error">Error: '+err.message+'</div>';btn.disabled=false;}
 }
