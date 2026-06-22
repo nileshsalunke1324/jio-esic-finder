@@ -43,11 +43,6 @@
   .modal { background: #fff; border-radius: 14px; padding: 1.5rem; width: 90%; max-width: 460px; max-height: 90vh; overflow-y: auto; }
   .modal h3 { font-size: 16px; font-weight: 500; margin-bottom: 1rem; color: #1a1a2e; }
   .modal-btns { display: flex; gap: 10px; margin-top: 1rem; justify-content: flex-end; }
-  .upload-area { border: 2px dashed #c5d0f5; border-radius: 10px; padding: 1.5rem; text-align: center; cursor: pointer; transition: border 0.2s; margin: 1rem 0; }
-  .upload-area:hover { border-color: #0a2463; }
-  .upload-area p { color: #7a82a0; font-size: 14px; }
-  .upload-area strong { color: #0a2463; display: block; font-size: 15px; margin-bottom: 6px; }
-  #fileInput { display: none; }
   .tag { display: inline-block; background: #e8edf8; color: #0a2463; font-size: 13px; padding: 2px 10px; border-radius: 4px; font-weight: 600; }
   .note { font-size: 12px; color: #7a82a0; margin-top: 10px; font-style: italic; }
   .progress-wrap { margin-top: 1rem; }
@@ -56,6 +51,8 @@
   .progress-bar-fill { background: #0a2463; height: 10px; border-radius: 20px; transition: width 0.3s ease; }
   .map-thumb { width: 100%; height: 180px; border-radius: 8px; border: 1px solid #c5d0f5; margin-top: 8px; overflow: hidden; }
   .map-thumb iframe { width: 100%; height: 100%; border: none; }
+  .init-status { text-align: center; padding: 2rem 1rem; color: #5a6690; font-size: 14px; }
+  .init-spinner { width: 32px; height: 32px; border: 3px solid #c5d0f5; border-top-color: #0a2463; border-radius: 50%; animation: spin 0.8s linear infinite; margin: 0 auto 1rem; }
 </style>
 </head>
 <body>
@@ -64,14 +61,8 @@
   <button class="admin-btn" onclick="showAdminLogin()">Admin</button>
 </div>
 <div class="container">
-  <div class="card">
-    <h2>Enter employee PIN code</h2>
-    <div class="input-row">
-      <input type="text" id="empPin" placeholder="e.g. 400072" maxlength="6" oninput="this.value=this.value.replace(/\D/g,'')" onkeydown="if(event.key==='Enter') findNearest()" />
-      <button class="btn" onclick="findNearest()" id="searchBtn">Find nearest</button>
-    </div>
-    <div class="db-status" id="dbStatus">Loading ESIC database...</div>
-    <div id="resultArea"></div>
+  <div class="card" id="mainCard">
+    <div class="init-status" id="initStatus"><div class="init-spinner"></div>Loading ESIC database from GitHub...</div>
   </div>
 </div>
 <div class="overlay" id="adminOverlay">
@@ -82,89 +73,89 @@
     <div class="modal-btns"><button class="btn btn-outline" onclick="closeModal()">Cancel</button><button class="btn" onclick="doLogin()">Login</button></div>
   </div>
 </div>
-<div class="overlay" id="uploadOverlay">
+<div class="overlay" id="adminPanel">
   <div class="modal" style="max-width:500px;">
-    <h3>Update ESIC database</h3>
-    <p style="font-size:13px;color:#7a82a0;">Upload Excel file. Coordinates are pre-computed once on upload so all searches are instant. Required columns: <strong>State, City, Pin Code, Final Build ID</strong></p>
-    <div class="upload-area" onclick="document.getElementById('fileInput').click()"><strong>Click to choose Excel file</strong><p>.xlsx or .xls format</p></div>
-    <input type="file" id="fileInput" accept=".xlsx,.xls" onchange="handleFile(event)" />
-    <div id="uploadStatus"></div>
-    <div id="uploadProgress" style="display:none;" class="progress-wrap">
-      <div class="progress-label"><span id="progressText">Geocoding...</span><span id="progressPct">0%</span></div>
-      <div class="progress-bar-bg"><div class="progress-bar-fill" id="progressFill" style="width:0%"></div></div>
+    <h3>Admin panel</h3>
+    <p style="font-size:13px;color:#5a6690;margin-bottom:1rem;">The ESIC database loads automatically from <strong>CC Build IDs.xlsx</strong> in the GitHub repo. To update, just replace that file in GitHub.</p>
+    <div style="background:#f5f6fa;border-radius:8px;padding:1rem;font-size:13px;">
+      <div style="margin-bottom:6px;"><strong>Repo:</strong> nileshsalunke1324/jio-esic-finder</div>
+      <div style="margin-bottom:6px;"><strong>Data file:</strong> CC Build IDs.xlsx</div>
+      <div id="adminDbStatus"></div>
     </div>
-    <div class="modal-btns"><button class="btn btn-outline" onclick="closeUpload()" id="closeUploadBtn">Close</button></div>
+    <div style="margin-top:1rem;">
+      <p style="font-size:13px;color:#5a6690;margin-bottom:8px;">After replacing the Excel in GitHub, clear the cache so new coordinates are fetched:</p>
+      <button class="btn btn-outline" style="font-size:13px;" onclick="clearCacheAndReload()">Clear geocode cache &amp; reload</button>
+    </div>
+    <div id="adminMsg" style="margin-top:0.75rem;"></div>
+    <div class="modal-btns"><button class="btn btn-outline" onclick="closeAdminPanel()">Close</button></div>
   </div>
 </div>
 <script>
-const ADMIN_PASS='Jio@2026',LS_DATA='jio_esic_v4_data',LS_CACHE='jio_esic_v4_empcache';
-let esicData=[],empCache={};
+const ADMIN_PASS='Jio@2026';
+const EXCEL_URL='https://raw.githubusercontent.com/nileshsalunke1324/jio-esic-finder/main/CC%20Build%20IDs.xlsx';
+const LS_GEO='jio_esic_v5_geo',LS_EMP='jio_esic_v5_emp';
+let esicData=[],geoCache={},empCache={};
 function lsSet(k,v){try{localStorage.setItem(k,JSON.stringify(v));return true;}catch(e){return false;}}
 function lsGet(k){try{const v=localStorage.getItem(k);return v?JSON.parse(v):null;}catch(e){return null;}}
-function loadData(){const d=lsGet(LS_DATA);if(d&&d.length){esicData=d;updateDbStatus();}else{document.getElementById('dbStatus').textContent='No ESIC data loaded. Admin must upload Excel file.';}empCache=lsGet(LS_CACHE)||{};}
-function updateDbStatus(){const g=esicData.filter(f=>f.lat!=null).length;document.getElementById('dbStatus').innerHTML='Database: <span>'+esicData.length+' ESIC facilities</span> &nbsp;|&nbsp; <span>'+g+' geocoded</span>';}
 function toRad(d){return d*Math.PI/180;}
 function haversine(la1,lo1,la2,lo2){const R=6371,dLa=toRad(la2-la1),dLo=toRad(lo2-lo1),a=Math.sin(dLa/2)**2+Math.cos(toRad(la1))*Math.cos(toRad(la2))*Math.sin(dLo/2)**2;return R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));}
+function delay(ms){return new Promise(r=>setTimeout(r,ms));}
 async function nominatimGeocode(pin){
-  try{const r=await fetch('https://nominatim.openstreetmap.org/search?postalcode='+encodeURIComponent(pin)+'&countrycodes=in&format=json&limit=1');if(r.ok){const d=await r.json();if(d&&d.length)return{lat:parseFloat(d[0].lat),lon:parseFloat(d[0].lon)};}}catch(e){console.warn('Nominatim fail',pin,e.message);}
-  try{const r=await fetch('https://photon.komoot.io/api/?q='+encodeURIComponent(pin+' India')+'&limit=1&lang=en');if(r.ok){const d=await r.json();if(d.features&&d.features.length){const[lon,lat]=d.features[0].geometry.coordinates;return{lat,lon};}}}catch(e){console.warn('Photon fail',pin,e.message);}
+  try{const r=await fetch('https://nominatim.openstreetmap.org/search?postalcode='+encodeURIComponent(pin)+'&countrycodes=in&format=json&limit=1');if(r.ok){const d=await r.json();if(d&&d.length)return{lat:parseFloat(d[0].lat),lon:parseFloat(d[0].lon)};}}catch(e){}
+  try{const r=await fetch('https://photon.komoot.io/api/?q='+encodeURIComponent(pin+' India')+'&limit=1&lang=en');if(r.ok){const d=await r.json();if(d.features&&d.features.length){const[lon,lat]=d.features[0].geometry.coordinates;return{lat,lon};}}}catch(e){}
   return null;
 }
 async function osrmDistance(la1,lo1,la2,lo2){try{const r=await fetch('https://router.project-osrm.org/route/v1/driving/'+lo1+','+la1+';'+lo2+','+la2+'?overview=false');const d=await r.json();if(d.code==='Ok'&&d.routes.length)return d.routes[0].distance/1000;}catch(e){}return null;}
-function delay(ms){return new Promise(r=>setTimeout(r,ms));}
+async function fetchExcel(){
+  const r=await fetch(EXCEL_URL+'?t='+Date.now());
+  if(!r.ok)throw new Error('Could not fetch Excel (status '+r.status+')');
+  const buf=await r.arrayBuffer();const wb=XLSX.read(buf,{type:'array'});const ws=wb.Sheets[wb.SheetNames[0]];
+  const rows=XLSX.utils.sheet_to_json(ws,{defval:''});const out=[];
+  for(const row of rows){const keys=Object.keys(row),sk=keys.find(k=>k.toLowerCase().includes('state')),ck=keys.find(k=>k.toLowerCase().includes('city')),pk=keys.find(k=>k.toLowerCase().includes('pin')),bk=keys.find(k=>k.toLowerCase().includes('build'));if(!pk||!bk)continue;const pin=String(row[pk]).trim(),buildId=String(row[bk]).trim();if(/^\d{6}$/.test(pin)&&buildId)out.push({state:sk?String(row[sk]).trim():'',city:ck?String(row[ck]).trim():'',pin,buildId});}
+  return out;
+}
+function showSearchUI(){const g=esicData.filter(f=>geoCache[f.pin]).length;document.getElementById('mainCard').innerHTML='<h2>Enter employee PIN code</h2><div class="input-row"><input type="text" id="empPin" placeholder="e.g. 400072" maxlength="6" oninput="this.value=this.value.replace(/\\D/g,'')" onkeydown="if(event.key==='Enter') findNearest()" /><button class="btn" onclick="findNearest()" id="searchBtn">Find nearest</button></div><div class="db-status">Database: <span>'+esicData.length+' ESIC facilities</span> &nbsp;|&nbsp; <span>'+g+' geocoded</span></div><div id="resultArea"></div>';}
+function showGeoUI(d,t){const p=Math.round((d/t)*100);document.getElementById('mainCard').innerHTML='<h2>One-time setup</h2><p style="font-size:13px;color:#5a6690;margin-bottom:1rem;">Geocoding ESIC facilities — please keep this tab open.</p><div class="progress-wrap"><div class="progress-label"><span id="gT">Geocoding '+d+' of '+t+'...</span><span id="gP">'+p+'%</span></div><div class="progress-bar-bg"><div class="progress-bar-fill" id="gF" style="width:'+p+'%"></div></div></div>';}
+function updGeo(d,t){const p=Math.round((d/t)*100);const f=document.getElementById('gF'),tx=document.getElementById('gT'),pp=document.getElementById('gP');if(f)f.style.width=p+'%';if(tx)tx.textContent='Geocoding '+d+' of '+t+'...';if(pp)pp.textContent=p+'%';}
+async function geocodeMissing(pins,onP){
+  const miss=pins.filter(p=>!geoCache[p]);if(!miss.length){onP&&onP(pins.length,pins.length);return;}
+  let done=pins.length-miss.length;onP&&onP(done,pins.length);
+  for(const pin of miss){const c=await nominatimGeocode(pin);if(c)geoCache[pin]=c;done++;onP&&onP(done,pins.length);await delay(1200);}
+  lsSet(LS_GEO,geoCache);
+}
+async function init(){
+  geoCache=lsGet(LS_GEO)||{};empCache=lsGet(LS_EMP)||{};
+  try{
+    esicData=await fetchExcel();if(!esicData.length)throw new Error('No valid data in Excel.');
+    const up=[...new Set(esicData.map(f=>f.pin))],miss=up.filter(p=>!geoCache[p]);
+    if(miss.length>0){showGeoUI(up.length-miss.length,up.length);await geocodeMissing(up,(d,t)=>updGeo(d,t));}
+    showSearchUI();
+  }catch(err){document.getElementById('mainCard').innerHTML='<div class="error">Failed to load: '+err.message+'<br><br><button class="btn" onclick="init()">Retry</button></div>';}
+}
 async function findNearest(){
   const pin=document.getElementById('empPin').value.trim(),area=document.getElementById('resultArea');
   if(pin.length!==6){area.innerHTML='<div class="error">Please enter a valid 6-digit PIN code.</div>';return;}
-  if(!esicData.length){area.innerHTML='<div class="error">ESIC database is empty. Please ask admin to upload the data.</div>';return;}
-  const gf=esicData.filter(f=>f.lat!=null);
-  if(!gf.length){area.innerHTML='<div class="info">ESIC coordinates not yet computed. Please ask admin to re-upload the Excel file.</div>';return;}
+  const gf=esicData.filter(f=>geoCache[f.pin]).map(f=>({...f,...geoCache[f.pin]}));
+  if(!gf.length){area.innerHTML='<div class="info">Setup not complete yet.</div>';return;}
   document.getElementById('searchBtn').disabled=true;
   area.innerHTML='<div class="loading"><div class="spinner"></div> Locating employee PIN code...</div>';
   try{
     let emp=empCache[pin];
-    if(!emp){emp=await nominatimGeocode(pin);if(!emp){area.innerHTML='<div class="error">Could not locate PIN '+pin+'.</div>';document.getElementById('searchBtn').disabled=false;return;}empCache[pin]=emp;lsSet(LS_CACHE,empCache);}
+    if(!emp){emp=await nominatimGeocode(pin);if(!emp){area.innerHTML='<div class="error">Could not locate PIN '+pin+'.</div>';document.getElementById('searchBtn').disabled=false;return;}empCache[pin]=emp;lsSet(LS_EMP,empCache);}
     const sorted=gf.map(f=>({...f,straight:haversine(emp.lat,emp.lon,f.lat,f.lon)})).sort((a,b)=>a.straight-b.straight).slice(0,6);
     area.innerHTML='<div class="loading"><div class="spinner"></div> Calculating road distances...</div>';
-    const wr=[];
-    for(const f of sorted){const km=await osrmDistance(emp.lat,emp.lon,f.lat,f.lon);wr.push({...f,roadKm:km!==null?km:f.straight,isRoad:km!==null});await delay(200);}
-    wr.sort((a,b)=>a.roadKm-b.roadKm);
-    const b=wr[0],dl=b.roadKm<1?(b.roadKm*1000).toFixed(0)+' m':b.roadKm.toFixed(1)+' km',dn=b.isRoad?'by road':'straight-line estimate';
+    const wr=[];for(const f of sorted){const km=await osrmDistance(emp.lat,emp.lon,f.lat,f.lon);wr.push({...f,roadKm:km!==null?km:f.straight,isRoad:km!==null});await delay(200);}
+    wr.sort((a,b)=>a.roadKm-b.roadKm);const b=wr[0];
+    const dl=b.roadKm<1?(b.roadKm*1000).toFixed(0)+' m':b.roadKm.toFixed(1)+' km',dn=b.isRoad?'by road':'straight-line estimate';
     const mu='https://www.openstreetmap.org/export/embed.html?bbox='+(b.lon-0.05).toFixed(4)+','+(b.lat-0.05).toFixed(4)+','+(b.lon+0.05).toFixed(4)+','+(b.lat+0.05).toFixed(4)+'&layer=mapnik&marker='+b.lat.toFixed(4)+','+b.lon.toFixed(4);
-    area.innerHTML='<div class="result-card"><div class="result-title">Nearest ESIC facility</div><div class="result-grid"><div class="result-item"><label>ESIC PIN code</label><span>'+b.pin+'</span></div><div class="result-item"><label>Final Build ID</label><span class="tag">'+b.buildId+'</span></div><div class="result-item"><label>City</label><span>'+b.city+'</span></div><div class="result-item"><label>State</label><span>'+b.state+'</span></div><div class="result-item full"><label>Distance from employee PIN '+pin+'</label><div style="margin-top:4px;"><span style="font-size:22px;font-weight:600;color:#0a2463;">'+dl+'</span><span style="font-size:13px;color:#5a6690;margin-left:6px;">'+dn+'</span></div></div><div class="result-item full"><label>Facility location</label><div class="map-thumb"><iframe src="'+mu+'" title="ESIC facility location" loading="lazy"></iframe></div></div></div><p class="note">Road distance via OpenStreetMap routing.</p></div>';
+    area.innerHTML='<div class="result-card"><div class="result-title">Nearest ESIC facility</div><div class="result-grid"><div class="result-item"><label>ESIC PIN code</label><span>'+b.pin+'</span></div><div class="result-item"><label>Final Build ID</label><span class="tag">'+b.buildId+'</span></div><div class="result-item"><label>City</label><span>'+b.city+'</span></div><div class="result-item"><label>State</label><span>'+b.state+'</span></div><div class="result-item full"><label>Distance from PIN '+pin+'</label><div style="margin-top:4px;"><span style="font-size:22px;font-weight:600;color:#0a2463;">'+dl+'</span><span style="font-size:13px;color:#5a6690;margin-left:6px;">'+dn+'</span></div></div><div class="result-item full"><label>Facility location</label><div class="map-thumb"><iframe src="'+mu+'" loading="lazy"></iframe></div></div></div><p class="note">Road distance via OpenStreetMap.</p></div>';
   }catch(e){area.innerHTML='<div class="error">Error: '+e.message+'</div>';}
   document.getElementById('searchBtn').disabled=false;
 }
 function showAdminLogin(){document.getElementById('adminOverlay').classList.add('show');setTimeout(()=>document.getElementById('adminPass').focus(),100);}
 function closeModal(){document.getElementById('adminOverlay').classList.remove('show');document.getElementById('adminPass').value='';document.getElementById('loginError').style.display='none';}
-function doLogin(){if(document.getElementById('adminPass').value===ADMIN_PASS){closeModal();document.getElementById('uploadOverlay').classList.add('show');}else{document.getElementById('loginError').style.display='block';}}
-function closeUpload(){document.getElementById('uploadOverlay').classList.remove('show');document.getElementById('uploadStatus').innerHTML='';document.getElementById('uploadProgress').style.display='none';}
-function setProgress(done,total,label){const p=Math.round((done/total)*100);document.getElementById('progressFill').style.width=p+'%';document.getElementById('progressPct').textContent=p+'%';document.getElementById('progressText').textContent=label||('Geocoding '+done+' of '+total+'...');}
-async function handleFile(e){
-  const file=e.target.files[0];if(!file)return;
-  const se=document.getElementById('uploadStatus'),pe=document.getElementById('uploadProgress');
-  se.innerHTML='<div class="loading"><div class="spinner"></div> Reading file...</div>';pe.style.display='none';document.getElementById('closeUploadBtn').disabled=true;
-  const reader=new FileReader();
-  reader.onload=async(evt)=>{
-    try{
-      const wb=XLSX.read(evt.target.result,{type:'binary'}),ws=wb.Sheets[wb.SheetNames[0]],rows=XLSX.utils.sheet_to_json(ws,{defval:''});
-      const parsed=[];
-      for(const row of rows){const keys=Object.keys(row),sk=keys.find(k=>k.toLowerCase().includes('state')),ck=keys.find(k=>k.toLowerCase().includes('city')),pk=keys.find(k=>k.toLowerCase().includes('pin')),bk=keys.find(k=>k.toLowerCase().includes('build'));if(!pk||!bk)continue;const pin=String(row[pk]).trim(),buildId=String(row[bk]).trim();if(/^\d{6}$/.test(pin)&&buildId)parsed.push({state:sk?String(row[sk]).trim():'',city:ck?String(row[ck]).trim():'',pin,buildId,lat:null,lon:null});}
-      if(!parsed.length){se.innerHTML='<div class="error">No valid rows found.</div>';document.getElementById('closeUploadBtn').disabled=false;return;}
-      const up=[...new Set(parsed.map(f=>f.pin))];
-      se.innerHTML='<div class="info">Read '+parsed.length+' facilities ('+up.length+' unique PINs). Geocoding — do not close this window.</div>';pe.style.display='block';setProgress(0,up.length);
-      const cm={};
-      for(let i=0;i<up.length;i++){try{const c=await nominatimGeocode(up[i]);if(c)cm[up[i]]=c;}catch(err){console.warn('fail',up[i],err.message);}setProgress(i+1,up.length);if((i+1)%10===0){for(const f of parsed){if(cm[f.pin]){f.lat=cm[f.pin].lat;f.lon=cm[f.pin].lon;}}lsSet(LS_DATA,parsed);}await delay(1200);}
-      for(const f of parsed){if(cm[f.pin]){f.lat=cm[f.pin].lat;f.lon=cm[f.pin].lon;}}
-      if(!lsSet(LS_DATA,parsed)){se.innerHTML='<div class="error">Storage limit exceeded.</div>';document.getElementById('closeUploadBtn').disabled=false;return;}
-      esicData=parsed;updateDbStatus();
-      const gc=parsed.filter(f=>f.lat!=null).length;setProgress(up.length,up.length,'Complete!');
-      se.innerHTML='<div class="success">Done! '+parsed.length+' facilities loaded, '+gc+' geocoded.</div>';document.getElementById('fileInput').value='';
-    }catch(err){se.innerHTML='<div class="error">Error: '+err.message+'</div>';}
-    document.getElementById('closeUploadBtn').disabled=false;
-  };
-  reader.readAsBinaryString(file);
-}
-loadData();
-</script>
-</body>
-</html>
+function doLogin(){if(document.getElementById('adminPass').value===ADMIN_PASS){closeModal();const g=esicData.filter(f=>geoCache[f.pin]).length;document.getElementById('adminDbStatus').innerHTML='<strong>Facilities:</strong> '+esicData.length+'<br><strong>Geocoded:</strong> '+g;document.getElementById('adminPanel').classList.add('show');}else{document.getElementById('loginError').style.display='block';}}
+function closeAdminPanel(){document.getElementById('adminPanel').classList.remove('show');document.getElementById('adminMsg').innerHTML='';}
+function clearCacheAndReload(){localStorage.removeItem(LS_GEO);localStorage.removeItem(LS_EMP);document.getElementById('adminMsg').innerHTML='<div class="success">Cache cleared! Reloading...</div>';setTimeout(()=>{closeAdminPanel();init();},1000);}
+init();
+</script></body></html>
