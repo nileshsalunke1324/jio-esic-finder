@@ -32,7 +32,8 @@
   .result-item.full { grid-column: 1 / -1; }
   .error { background: #fff2f2; border: 1px solid #ffc5c5; color: #b00; border-radius: 8px; padding: 10px 14px; margin-top: 1rem; font-size: 14px; }
   .success { background: #f0fff4; border: 1px solid #b2dfdb; color: #1b5e20; border-radius: 8px; padding: 10px 14px; margin-top: 1rem; font-size: 14px; }
-  .info { background: #e8f0fe; border: 1px solid #b8ccf8; color: #1a3a8f; border-radius: 8px; padding: 10px 14px; margin-top: 1rem; font-size: 14px; }
+  .info { background: #e8f0fe; border: 1px solid #b8ccf8; color: #1a3a8f; border-radius: 8px; padding: 10px 14px; font-size: 13px; }
+  .warning { background: #fff8e1; border: 1px solid #ffe082; color: #7a5800; border-radius: 8px; padding: 10px 14px; font-size: 13px; }
   .loading { color: #5a6690; font-size: 14px; margin-top: 1rem; display: flex; align-items: center; gap: 8px; }
   .spinner { width: 16px; height: 16px; border: 2px solid #c5d0f5; border-top-color: #0a2463; border-radius: 50%; animation: spin 0.8s linear infinite; flex-shrink: 0; }
   @keyframes spin { to { transform: rotate(360deg); } }
@@ -40,8 +41,9 @@
   .db-status span { font-weight: 500; color: #0a2463; }
   .overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.4); z-index: 100; align-items: center; justify-content: center; }
   .overlay.show { display: flex; }
-  .modal { background: #fff; border-radius: 14px; padding: 1.5rem; width: 90%; max-width: 460px; max-height: 90vh; overflow-y: auto; }
-  .modal h3 { font-size: 16px; font-weight: 500; margin-bottom: 1rem; color: #1a1a2e; }
+  .modal { background: #fff; border-radius: 14px; padding: 1.5rem; width: 90%; max-width: 500px; max-height: 90vh; overflow-y: auto; }
+  .modal h3 { font-size: 16px; font-weight: 600; margin-bottom: 0.25rem; color: #1a1a2e; }
+  .modal-sub { font-size: 12px; color: #7a82a0; margin-bottom: 1rem; }
   .modal-btns { display: flex; gap: 10px; margin-top: 1rem; justify-content: flex-end; }
   .tag { display: inline-block; background: #e8edf8; color: #0a2463; font-size: 13px; padding: 2px 10px; border-radius: 4px; font-weight: 600; }
   .note { font-size: 12px; color: #7a82a0; margin-top: 10px; font-style: italic; }
@@ -53,6 +55,12 @@
   .map-thumb iframe { width: 100%; height: 100%; border: none; }
   .init-status { text-align: center; padding: 2rem 1rem; color: #5a6690; font-size: 14px; }
   .init-spinner { width: 32px; height: 32px; border: 3px solid #c5d0f5; border-top-color: #0a2463; border-radius: 50%; animation: spin 0.8s linear infinite; margin: 0 auto 1rem; }
+  .step { display: flex; align-items: flex-start; gap: 12px; padding: 10px 0; border-bottom: 0.5px solid #f0f0f0; }
+  .step:last-child { border-bottom: none; }
+  .step-num { width: 24px; height: 24px; border-radius: 50%; background: #0a2463; color: #fff; font-size: 12px; font-weight: 600; display: flex; align-items: center; justify-content: center; flex-shrink: 0; margin-top: 1px; }
+  .step-text { font-size: 13px; color: #3a3a5c; line-height: 1.5; }
+  .step-text strong { color: #1a1a2e; }
+  hr { border: none; border-top: 0.5px solid #e2e4ea; margin: 1rem 0; }
 </style>
 </head>
 <body>
@@ -61,40 +69,46 @@
   <button class="admin-btn" onclick="showAdminLogin()">Admin</button>
 </div>
 <div class="container">
-  <div class="card" id="mainCard">
-    <div class="init-status" id="initStatus"><div class="init-spinner"></div>Loading ESIC database from GitHub...</div>
-  </div>
+  <div class="card" id="mainCard"><div class="init-status"><div class="init-spinner"></div>Loading ESIC database...</div></div>
 </div>
 <div class="overlay" id="adminOverlay">
   <div class="modal">
-    <h3>Admin login</h3>
+    <h3>Admin login</h3><div class="modal-sub">Jio ESIC PIN Finder</div>
     <input type="password" id="adminPass" placeholder="Enter admin password" style="width:100%;margin-bottom:8px;" onkeydown="if(event.key==='Enter') doLogin()" />
     <div id="loginError" class="error" style="display:none;">Incorrect password.</div>
-    <div class="modal-btns"><button class="btn btn-outline" onclick="closeModal()">Cancel</button><button class="btn" onclick="doLogin()">Login</button></div>
+    <div class="modal-btns"><button class="btn btn-outline" onclick="closeAdminLogin()">Cancel</button><button class="btn" onclick="doLogin()">Login</button></div>
   </div>
 </div>
 <div class="overlay" id="adminPanel">
-  <div class="modal" style="max-width:500px;">
-    <h3>Admin panel</h3>
-    <p style="font-size:13px;color:#5a6690;margin-bottom:1rem;">The ESIC database loads automatically from <strong>CC Build IDs.xlsx</strong> in the GitHub repo. To update, just replace that file in GitHub.</p>
-    <div style="background:#f5f6fa;border-radius:8px;padding:1rem;font-size:13px;">
-      <div style="margin-bottom:6px;"><strong>Repo:</strong> nileshsalunke1324/jio-esic-finder</div>
-      <div style="margin-bottom:6px;"><strong>Data file:</strong> CC Build IDs.xlsx</div>
-      <div id="adminDbStatus"></div>
+  <div class="modal">
+    <h3>Admin panel</h3><div class="modal-sub">Jio ESIC PIN Finder</div>
+    <div class="info" style="margin-bottom:1rem;"><strong>How it works:</strong> When you upload a new Excel to GitHub, run geocoding once from here. Download the <code>coords.json</code> file and upload it to GitHub. All recruiters then load instantly — no geocoding ever.</div>
+    <div id="adminDbInfo" style="font-size:13px;color:#3a3a5c;margin-bottom:1rem;"></div>
+    <hr>
+    <p style="font-size:13px;font-weight:600;color:#1a1a2e;margin-bottom:0.75rem;">When you update the Excel in GitHub:</p>
+    <div class="step"><div class="step-num">1</div><div class="step-text">Upload new <strong>CC Build IDs.xlsx</strong> to GitHub repo</div></div>
+    <div class="step"><div class="step-num">2</div><div class="step-text">Click <strong>"Run geocoding"</strong> below (~5 mins, one-time)</div></div>
+    <div class="step"><div class="step-num">3</div><div class="step-text"><strong>coords.json</strong> downloads automatically to your computer</div></div>
+    <div class="step"><div class="step-num">4</div><div class="step-text">Upload <strong>coords.json</strong> to GitHub repo (same folder as index.html)</div></div>
+    <div class="step"><div class="step-num">5</div><div class="step-text">Done — all recruiters load instantly, zero geocoding wait</div></div>
+    <hr>
+    <div id="geocodeStatus"></div>
+    <div id="geocodeProgress" style="display:none;" class="progress-wrap">
+      <div class="progress-label"><span id="gText">Starting...</span><span id="gPct">0%</span></div>
+      <div class="progress-bar-bg"><div class="progress-bar-fill" id="gFill" style="width:0%"></div></div>
     </div>
-    <div style="margin-top:1rem;">
-      <p style="font-size:13px;color:#5a6690;margin-bottom:8px;">After replacing the Excel in GitHub, clear the cache so new coordinates are fetched:</p>
-      <button class="btn btn-outline" style="font-size:13px;" onclick="clearCacheAndReload()">Clear geocode cache &amp; reload</button>
+    <div class="modal-btns">
+      <button class="btn btn-outline" onclick="closeAdminPanel()">Close</button>
+      <button class="btn" id="runGeoBtn" onclick="runGeocoding()">Run geocoding &amp; download coords.json</button>
     </div>
-    <div id="adminMsg" style="margin-top:0.75rem;"></div>
-    <div class="modal-btns"><button class="btn btn-outline" onclick="closeAdminPanel()">Close</button></div>
   </div>
 </div>
 <script>
 const ADMIN_PASS='Jio@2026';
 const EXCEL_URL='https://raw.githubusercontent.com/nileshsalunke1324/jio-esic-finder/main/CC%20Build%20IDs.xlsx';
-const LS_GEO='jio_esic_v5_geo',LS_EMP='jio_esic_v5_emp';
-let esicData=[],geoCache={},empCache={};
+const COORDS_URL='https://raw.githubusercontent.com/nileshsalunke1324/jio-esic-finder/main/coords.json';
+const LS_EMP='jio_esic_v6_emp';
+let esicData=[],empCache={};
 function lsSet(k,v){try{localStorage.setItem(k,JSON.stringify(v));return true;}catch(e){return false;}}
 function lsGet(k){try{const v=localStorage.getItem(k);return v?JSON.parse(v):null;}catch(e){return null;}}
 function toRad(d){return d*Math.PI/180;}
@@ -107,36 +121,34 @@ async function nominatimGeocode(pin){
 }
 async function osrmDistance(la1,lo1,la2,lo2){try{const r=await fetch('https://router.project-osrm.org/route/v1/driving/'+lo1+','+la1+';'+lo2+','+la2+'?overview=false');const d=await r.json();if(d.code==='Ok'&&d.routes.length)return d.routes[0].distance/1000;}catch(e){}return null;}
 async function fetchExcel(){
-  const r=await fetch(EXCEL_URL+'?t='+Date.now());
-  if(!r.ok)throw new Error('Could not fetch Excel (status '+r.status+')');
-  const buf=await r.arrayBuffer();const wb=XLSX.read(buf,{type:'array'});const ws=wb.Sheets[wb.SheetNames[0]];
+  const r=await fetch(EXCEL_URL+'?t='+Date.now());if(!r.ok)throw new Error('Could not fetch Excel ('+r.status+')');
+  const wb=XLSX.read(await r.arrayBuffer(),{type:'array'});const ws=wb.Sheets[wb.SheetNames[0]];
   const rows=XLSX.utils.sheet_to_json(ws,{defval:''});const out=[];
-  for(const row of rows){const keys=Object.keys(row),sk=keys.find(k=>k.toLowerCase().includes('state')),ck=keys.find(k=>k.toLowerCase().includes('city')),pk=keys.find(k=>k.toLowerCase().includes('pin')),bk=keys.find(k=>k.toLowerCase().includes('build'));if(!pk||!bk)continue;const pin=String(row[pk]).trim(),buildId=String(row[bk]).trim();if(/^\d{6}$/.test(pin)&&buildId)out.push({state:sk?String(row[sk]).trim():'',city:ck?String(row[ck]).trim():'',pin,buildId});}
+  for(const row of rows){const keys=Object.keys(row),sk=keys.find(k=>k.toLowerCase().includes('state')),ck=keys.find(k=>k.toLowerCase().includes('city')),pk=keys.find(k=>k.toLowerCase().includes('pin')),bk=keys.find(k=>k.toLowerCase().includes('build'));if(!pk||!bk)continue;const pin=String(row[pk]).trim(),buildId=String(row[bk]).trim();if(/^d{6}$/.test(pin)&&buildId)out.push({state:sk?String(row[sk]).trim():'',city:ck?String(row[ck]).trim():'',pin,buildId,lat:null,lon:null});}
   return out;
 }
-function showSearchUI(){const g=esicData.filter(f=>geoCache[f.pin]).length;document.getElementById('mainCard').innerHTML='<h2>Enter employee PIN code</h2><div class="input-row"><input type="text" id="empPin" placeholder="e.g. 400072" maxlength="6" oninput="this.value=this.value.replace(/\\D/g,'')" onkeydown="if(event.key==='Enter') findNearest()" /><button class="btn" onclick="findNearest()" id="searchBtn">Find nearest</button></div><div class="db-status">Database: <span>'+esicData.length+' ESIC facilities</span> &nbsp;|&nbsp; <span>'+g+' geocoded</span></div><div id="resultArea"></div>';}
-function showGeoUI(d,t){const p=Math.round((d/t)*100);document.getElementById('mainCard').innerHTML='<h2>One-time setup</h2><p style="font-size:13px;color:#5a6690;margin-bottom:1rem;">Geocoding ESIC facilities — please keep this tab open.</p><div class="progress-wrap"><div class="progress-label"><span id="gT">Geocoding '+d+' of '+t+'...</span><span id="gP">'+p+'%</span></div><div class="progress-bar-bg"><div class="progress-bar-fill" id="gF" style="width:'+p+'%"></div></div></div>';}
-function updGeo(d,t){const p=Math.round((d/t)*100);const f=document.getElementById('gF'),tx=document.getElementById('gT'),pp=document.getElementById('gP');if(f)f.style.width=p+'%';if(tx)tx.textContent='Geocoding '+d+' of '+t+'...';if(pp)pp.textContent=p+'%';}
-async function geocodeMissing(pins,onP){
-  const miss=pins.filter(p=>!geoCache[p]);if(!miss.length){onP&&onP(pins.length,pins.length);return;}
-  let done=pins.length-miss.length;onP&&onP(done,pins.length);
-  for(const pin of miss){const c=await nominatimGeocode(pin);if(c)geoCache[pin]=c;done++;onP&&onP(done,pins.length);await delay(1200);}
-  lsSet(LS_GEO,geoCache);
-}
+async function fetchCoords(){try{const r=await fetch(COORDS_URL+'?t='+Date.now());if(r.ok)return await r.json();}catch(e){}return null;}
+function mergeCoords(fac,cm){return fac.map(f=>({...f,...(cm&&cm[f.pin]?cm[f.pin]:{})}));}
 async function init(){
-  geoCache=lsGet(LS_GEO)||{};empCache=lsGet(LS_EMP)||{};
+  empCache=lsGet(LS_EMP)||{};
+  document.getElementById('mainCard').innerHTML='<div class="init-status"><div class="init-spinner"></div>Loading ESIC database...</div>';
   try{
-    esicData=await fetchExcel();if(!esicData.length)throw new Error('No valid data in Excel.');
-    const up=[...new Set(esicData.map(f=>f.pin))],miss=up.filter(p=>!geoCache[p]);
-    if(miss.length>0){showGeoUI(up.length-miss.length,up.length);await geocodeMissing(up,(d,t)=>updGeo(d,t));}
-    showSearchUI();
-  }catch(err){document.getElementById('mainCard').innerHTML='<div class="error">Failed to load: '+err.message+'<br><br><button class="btn" onclick="init()">Retry</button></div>';}
+    const[rawData,coordsMap]=await Promise.all([fetchExcel(),fetchCoords()]);
+    if(!rawData.length)throw new Error('No valid data in Excel file.');
+    esicData=mergeCoords(rawData,coordsMap);
+    showSearchUI(esicData.filter(f=>f.lat!=null).length);
+  }catch(err){document.getElementById('mainCard').innerHTML='<div class="error">Failed to load: '+err.message+'<br><br><button class="btn" onclick="init()" style="margin-top:8px;">Retry</button></div>';}
+}
+function showSearchUI(geocoded){
+  const total=esicData.length;
+  const warn=geocoded===0?'<div class="warning" style="margin-top:0.75rem;">No coordinates loaded. Admin must run geocoding and upload coords.json to GitHub.</div>':geocoded<total?'<div class="warning" style="margin-top:0.75rem;">Only '+geocoded+' of '+total+' facilities geocoded. Admin should re-run geocoding.</div>':'';
+  document.getElementById('mainCard').innerHTML='<h2>Enter employee PIN code</h2><div class="input-row"><input type="text" id="empPin" placeholder="e.g. 400072" maxlength="6" oninput="this.value=this.value.replace(/\D/g,'')" onkeydown="if(event.key==='Enter') findNearest()" /><button class="btn" onclick="findNearest()" id="searchBtn">Find nearest</button></div><div class="db-status">Database: <span>'+total+' ESIC facilities</span> &nbsp;|&nbsp; <span>'+geocoded+' geocoded</span></div>'+warn+'<div id="resultArea"></div>';
 }
 async function findNearest(){
   const pin=document.getElementById('empPin').value.trim(),area=document.getElementById('resultArea');
   if(pin.length!==6){area.innerHTML='<div class="error">Please enter a valid 6-digit PIN code.</div>';return;}
-  const gf=esicData.filter(f=>geoCache[f.pin]).map(f=>({...f,...geoCache[f.pin]}));
-  if(!gf.length){area.innerHTML='<div class="info">Setup not complete yet.</div>';return;}
+  const gf=esicData.filter(f=>f.lat!=null);
+  if(!gf.length){area.innerHTML='<div class="warning">No geocoded facilities. Ask admin to run geocoding and upload coords.json.</div>';return;}
   document.getElementById('searchBtn').disabled=true;
   area.innerHTML='<div class="loading"><div class="spinner"></div> Locating employee PIN code...</div>';
   try{
@@ -148,14 +160,35 @@ async function findNearest(){
     wr.sort((a,b)=>a.roadKm-b.roadKm);const b=wr[0];
     const dl=b.roadKm<1?(b.roadKm*1000).toFixed(0)+' m':b.roadKm.toFixed(1)+' km',dn=b.isRoad?'by road':'straight-line estimate';
     const mu='https://www.openstreetmap.org/export/embed.html?bbox='+(b.lon-0.05).toFixed(4)+','+(b.lat-0.05).toFixed(4)+','+(b.lon+0.05).toFixed(4)+','+(b.lat+0.05).toFixed(4)+'&layer=mapnik&marker='+b.lat.toFixed(4)+','+b.lon.toFixed(4);
-    area.innerHTML='<div class="result-card"><div class="result-title">Nearest ESIC facility</div><div class="result-grid"><div class="result-item"><label>ESIC PIN code</label><span>'+b.pin+'</span></div><div class="result-item"><label>Final Build ID</label><span class="tag">'+b.buildId+'</span></div><div class="result-item"><label>City</label><span>'+b.city+'</span></div><div class="result-item"><label>State</label><span>'+b.state+'</span></div><div class="result-item full"><label>Distance from PIN '+pin+'</label><div style="margin-top:4px;"><span style="font-size:22px;font-weight:600;color:#0a2463;">'+dl+'</span><span style="font-size:13px;color:#5a6690;margin-left:6px;">'+dn+'</span></div></div><div class="result-item full"><label>Facility location</label><div class="map-thumb"><iframe src="'+mu+'" loading="lazy"></iframe></div></div></div><p class="note">Road distance via OpenStreetMap.</p></div>';
+    area.innerHTML='<div class="result-card"><div class="result-title">Nearest ESIC facility</div><div class="result-grid"><div class="result-item"><label>ESIC PIN code</label><span>'+b.pin+'</span></div><div class="result-item"><label>Final Build ID</label><span class="tag">'+b.buildId+'</span></div><div class="result-item"><label>City</label><span>'+b.city+'</span></div><div class="result-item"><label>State</label><span>'+b.state+'</span></div><div class="result-item full"><label>Distance from employee PIN '+pin+'</label><div style="margin-top:4px;"><span style="font-size:22px;font-weight:600;color:#0a2463;">'+dl+'</span><span style="font-size:13px;color:#5a6690;margin-left:6px;">'+dn+'</span></div></div><div class="result-item full"><label>Facility location</label><div class="map-thumb"><iframe src="'+mu+'" loading="lazy"></iframe></div></div></div><p class="note">Road distance via OpenStreetMap routing.</p></div>';
   }catch(e){area.innerHTML='<div class="error">Error: '+e.message+'</div>';}
   document.getElementById('searchBtn').disabled=false;
 }
 function showAdminLogin(){document.getElementById('adminOverlay').classList.add('show');setTimeout(()=>document.getElementById('adminPass').focus(),100);}
-function closeModal(){document.getElementById('adminOverlay').classList.remove('show');document.getElementById('adminPass').value='';document.getElementById('loginError').style.display='none';}
-function doLogin(){if(document.getElementById('adminPass').value===ADMIN_PASS){closeModal();const g=esicData.filter(f=>geoCache[f.pin]).length;document.getElementById('adminDbStatus').innerHTML='<strong>Facilities:</strong> '+esicData.length+'<br><strong>Geocoded:</strong> '+g;document.getElementById('adminPanel').classList.add('show');}else{document.getElementById('loginError').style.display='block';}}
-function closeAdminPanel(){document.getElementById('adminPanel').classList.remove('show');document.getElementById('adminMsg').innerHTML='';}
-function clearCacheAndReload(){localStorage.removeItem(LS_GEO);localStorage.removeItem(LS_EMP);document.getElementById('adminMsg').innerHTML='<div class="success">Cache cleared! Reloading...</div>';setTimeout(()=>{closeAdminPanel();init();},1000);}
+function closeAdminLogin(){document.getElementById('adminOverlay').classList.remove('show');document.getElementById('adminPass').value='';document.getElementById('loginError').style.display='none';}
+function doLogin(){if(document.getElementById('adminPass').value===ADMIN_PASS){closeAdminLogin();const g=esicData.filter(f=>f.lat!=null).length;document.getElementById('adminDbInfo').innerHTML='<strong>Facilities:</strong> '+esicData.length+' &nbsp;|&nbsp; <strong>Geocoded:</strong> '+g+(g===esicData.length?' ✅':' ⚠️ needs geocoding');document.getElementById('adminPanel').classList.add('show');}else{document.getElementById('loginError').style.display='block';}}
+function closeAdminPanel(){document.getElementById('adminPanel').classList.remove('show');document.getElementById('geocodeStatus').innerHTML='';document.getElementById('geocodeProgress').style.display='none';document.getElementById('runGeoBtn').disabled=false;}
+async function runGeocoding(){
+  const btn=document.getElementById('runGeoBtn'),se=document.getElementById('geocodeStatus'),pe=document.getElementById('geocodeProgress');
+  btn.disabled=true;pe.style.display='block';
+  se.innerHTML='<div class="info" style="margin-bottom:0.5rem;">Fetching latest Excel from GitHub...</div>';
+  try{
+    const rawData=await fetchExcel();if(!rawData.length)throw new Error('No data in Excel.');
+    const up=[...new Set(rawData.map(f=>f.pin))];
+    const cm={};for(const f of esicData){if(f.lat!=null)cm[f.pin]={lat:f.lat,lon:f.lon};}
+    se.innerHTML='<div class="info" style="margin-bottom:0.5rem;">Geocoding '+up.length+' PIN codes. Do not close this window.</div>';
+    updGeo(0,up.length);
+    for(let i=0;i<up.length;i++){if(!cm[up[i]]){const c=await nominatimGeocode(up[i]);if(c)cm[up[i]]=c;}updGeo(i+1,up.length);await delay(1200);}
+    esicData=mergeCoords(rawData,cm);
+    const blob=new Blob([JSON.stringify(cm,null,2)],{type:'application/json'});
+    const a=Object.assign(document.createElement('a'),{href:URL.createObjectURL(blob),download:'coords.json'});
+    a.click();URL.revokeObjectURL(a.href);
+    updGeo(up.length,up.length,'Done!');
+    const gc=Object.keys(cm).length;
+    se.innerHTML='<div class="success" style="margin-bottom:0.75rem;">✅ Geocoded '+gc+' of '+up.length+' PIN codes.<br><strong>coords.json downloaded.</strong></div><div class="info"><strong>Next step:</strong> Upload coords.json to your GitHub repo. All recruiters will load instantly.</div>';
+    showSearchUI(esicData.filter(f=>f.lat!=null).length);
+  }catch(err){se.innerHTML='<div class="error">Error: '+err.message+'</div>';btn.disabled=false;}
+}
+function updGeo(d,t,l){const p=Math.round((d/t)*100);document.getElementById('gFill').style.width=p+'%';document.getElementById('gPct').textContent=p+'%';document.getElementById('gText').textContent=l||(d===t?'Complete!':'Geocoding '+d+' of '+t+'...');}
 init();
 </script></body></html>
