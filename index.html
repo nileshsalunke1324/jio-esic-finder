@@ -40,10 +40,10 @@
   .db-status span { font-weight: 500; color: #0a2463; }
   .overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.4); z-index: 100; align-items: center; justify-content: center; }
   .overlay.show { display: flex; }
-  .modal { background: #fff; border-radius: 14px; padding: 1.5rem; width: 90%; max-width: 460px; }
+  .modal { background: #fff; border-radius: 14px; padding: 1.5rem; width: 90%; max-width: 460px; max-height: 90vh; overflow-y: auto; }
   .modal h3 { font-size: 16px; font-weight: 500; margin-bottom: 1rem; color: #1a1a2e; }
   .modal-btns { display: flex; gap: 10px; margin-top: 1rem; justify-content: flex-end; }
-  .upload-area { border: 2px dashed #c5d0f5; border-radius: 10px; padding: 2rem; text-align: center; cursor: pointer; transition: border 0.2s; margin: 1rem 0; }
+  .upload-area { border: 2px dashed #c5d0f5; border-radius: 10px; padding: 1.5rem; text-align: center; cursor: pointer; transition: border 0.2s; margin: 1rem 0; }
   .upload-area:hover { border-color: #0a2463; }
   .upload-area p { color: #7a82a0; font-size: 14px; }
   .upload-area strong { color: #0a2463; display: block; font-size: 15px; margin-bottom: 6px; }
@@ -99,7 +99,7 @@
 <div class="overlay" id="uploadOverlay">
   <div class="modal" style="max-width:500px;">
     <h3>Update ESIC database</h3>
-    <p style="font-size:13px;color:#7a82a0;">Upload a new Excel file. Coordinates are pre-computed on upload so all searches are fast. Required columns: <strong>State, City, Pin Code, Final Build ID</strong></p>
+    <p style="font-size:13px;color:#7a82a0;">Upload Excel file. Coordinates are pre-computed once on upload so all searches are instant. Required columns: <strong>State, City, Pin Code, Final Build ID</strong></p>
     <div class="upload-area" onclick="document.getElementById('fileInput').click()">
       <strong>Click to choose Excel file</strong>
       <p>.xlsx or .xls format</p>
@@ -107,7 +107,7 @@
     <input type="file" id="fileInput" accept=".xlsx,.xls" onchange="handleFile(event)" />
     <div id="uploadStatus"></div>
     <div id="uploadProgress" style="display:none;" class="progress-wrap">
-      <div class="progress-label"><span id="progressText">Geocoding facilities...</span><span id="progressPct">0%</span></div>
+      <div class="progress-label"><span id="progressText">Geocoding...</span><span id="progressPct">0%</span></div>
       <div class="progress-bar-bg"><div class="progress-bar-fill" id="progressFill" style="width:0%"></div></div>
     </div>
     <div class="modal-btns">
@@ -118,14 +118,19 @@
 
 <script>
 const ADMIN_PASS = 'Jio@2026';
-const LS_DATA = 'jio_esic_v3_data';
-const LS_CACHE = 'jio_esic_v3_empcache';
+const LS_DATA  = 'jio_esic_v4_data';
+const LS_CACHE = 'jio_esic_v4_empcache';
 let esicData = [];
 let empCache = {};
 
-// --- localStorage helpers (works on any host) ---
-function lsSet(key, val) { try { localStorage.setItem(key, JSON.stringify(val)); return true; } catch(e) { console.warn('localStorage write failed:', e); return false; } }
-function lsGet(key) { try { const v = localStorage.getItem(key); return v ? JSON.parse(v) : null; } catch(e) { return null; } }
+function lsSet(key, val) {
+  try { localStorage.setItem(key, JSON.stringify(val)); return true; }
+  catch(e) { console.warn('lsSet failed', e); return false; }
+}
+function lsGet(key) {
+  try { const v = localStorage.getItem(key); return v ? JSON.parse(v) : null; }
+  catch(e) { return null; }
+}
 
 function loadData() {
   const d = lsGet(LS_DATA);
@@ -135,9 +140,9 @@ function loadData() {
 }
 
 function updateDbStatus() {
-  const geocoded = esicData.filter(f => f.lat != null).length;
+  const g = esicData.filter(f => f.lat != null).length;
   document.getElementById('dbStatus').innerHTML =
-    `Database: <span>${esicData.length} ESIC facilities</span> &nbsp;|&nbsp; <span>${geocoded} geocoded</span>`;
+    `Database: <span>${esicData.length} ESIC facilities</span> &nbsp;|&nbsp; <span>${g} geocoded</span>`;
 }
 
 function toRad(d) { return d * Math.PI / 180; }
@@ -147,96 +152,73 @@ function haversine(la1, lo1, la2, lo2) {
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
 }
 
-function extractJSON(text) {
-  try { return JSON.parse(text.trim()); } catch(_) {}
-  const s = text.replace(/```[\w]*\n?/g,'').trim();
-  try { return JSON.parse(s); } catch(_) {}
-  const i1 = text.indexOf('['), i2 = text.lastIndexOf(']');
-  if (i1 !== -1 && i2 > i1) { try { return JSON.parse(text.slice(i1,i2+1)); } catch(_) {} }
-  const j1 = text.indexOf('{'), j2 = text.lastIndexOf('}');
-  if (j1 !== -1 && j2 > j1) { try { return JSON.parse('['+text.slice(j1,j2+1)+']'); } catch(_) {} }
-  throw new Error('Could not parse AI response.');
+// Nominatim geocode — free, no key, works from any domain
+async function nominatimGeocode(pin) {
+  const url = `https://nominatim.openstreetmap.org/search?postalcode=${pin}&countrycodes=in&format=json&limit=1`;
+  const r = await fetch(url, { headers: { 'Accept-Language': 'en', 'User-Agent': 'JioESICFinder/1.0' } });
+  const data = await r.json();
+  if (data && data.length) return { lat: parseFloat(data[0].lat), lon: parseFloat(data[0].lon) };
+  return null;
 }
 
-async function claudeCall(prompt, maxTokens) {
-  const res = await fetch('https://api.anthropic.com/v1/messages', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      model: 'claude-sonnet-4-6',
-      max_tokens: maxTokens || 1000,
-      system: 'You are a geocoding assistant. Always respond with valid raw JSON only. No markdown, no code fences, no explanation whatsoever. Just the raw JSON array.',
-      messages: [{ role: 'user', content: prompt }]
-    })
-  });
-  const data = await res.json();
-  if (data.error) throw new Error(data.error.message);
-  const text = data.content.filter(b => b.type==='text').map(b => b.text).join('');
-  return extractJSON(text);
+// OSRM road routing — free, no key, works from any domain
+async function osrmDistance(la1, lo1, la2, lo2) {
+  const url = `https://router.project-osrm.org/route/v1/driving/${lo1},${la1};${lo2},${la2}?overview=false`;
+  const r = await fetch(url);
+  const d = await r.json();
+  if (d.code === 'Ok' && d.routes.length) return d.routes[0].distance / 1000;
+  return null;
 }
 
-async function geocodePins(pins) {
-  return claudeCall(
-    `Return a JSON array of coordinates for these Indian postal PIN codes.\nFormat: [{"pin":"XXXXXX","lat":12.3456,"lon":77.1234}]\nUse null for unknown PINs.\nPIN codes: ${pins.join(', ')}`,
-    1000
-  );
-}
-
-async function getRoadDistances(eLat, eLon, ePin, facilities) {
-  const list = facilities.map((f,i) =>
-    `${i+1}. PIN ${f.pin}, ${f.city}, ${f.state} (lat:${f.lat.toFixed(4)},lon:${f.lon.toFixed(4)})`
-  ).join('\n');
-  return claudeCall(
-    `Employee at lat ${eLat.toFixed(4)}, lon ${eLon.toFixed(4)} (PIN ${ePin}, India).\nEstimate road distance in km to each ESIC facility using Indian road network knowledge.\nReturn JSON: [{"i":1,"pin":"XXXXXX","km":12.5}]\nFacilities:\n${list}`,
-    600
-  );
-}
+// Delay helper to respect Nominatim rate limit (1 req/sec)
+function delay(ms) { return new Promise(res => setTimeout(res, ms)); }
 
 async function findNearest() {
   const pin = document.getElementById('empPin').value.trim();
   const area = document.getElementById('resultArea');
   if (pin.length !== 6) { area.innerHTML = '<div class="error">Please enter a valid 6-digit PIN code.</div>'; return; }
   if (!esicData.length) { area.innerHTML = '<div class="error">ESIC database is empty. Please ask admin to upload the data.</div>'; return; }
-  const geocodedFacilities = esicData.filter(f => f.lat != null);
-  if (!geocodedFacilities.length) { area.innerHTML = '<div class="info">ESIC coordinates not yet computed. Please ask admin to re-upload the Excel file.</div>'; return; }
+  const geoFacilities = esicData.filter(f => f.lat != null);
+  if (!geoFacilities.length) { area.innerHTML = '<div class="info">ESIC coordinates not yet computed. Please ask admin to re-upload the Excel file.</div>'; return; }
 
   document.getElementById('searchBtn').disabled = true;
   area.innerHTML = '<div class="loading"><div class="spinner"></div> Locating employee PIN code...</div>';
 
   try {
-    let empCoords = empCache[pin];
-    if (!empCoords) {
-      const geo = await geocodePins([pin]);
-      const e = Array.isArray(geo) ? geo[0] : geo;
-      if (!e || e.lat == null) {
+    // Step 1: geocode employee PIN (with cache)
+    let emp = empCache[pin];
+    if (!emp) {
+      emp = await nominatimGeocode(pin);
+      if (!emp) {
         area.innerHTML = '<div class="error">Could not locate PIN code ' + pin + '. Please verify and try again.</div>';
         document.getElementById('searchBtn').disabled = false; return;
       }
-      empCoords = { lat: e.lat, lon: e.lon };
-      empCache[pin] = empCoords;
+      empCache[pin] = emp;
       lsSet(LS_CACHE, empCache);
     }
 
-    area.innerHTML = '<div class="loading"><div class="spinner"></div> Calculating road distances...</div>';
+    // Step 2: sort all geocoded facilities by straight-line, take top 6
+    const sorted = geoFacilities
+      .map(f => ({ ...f, straight: haversine(emp.lat, emp.lon, f.lat, f.lon) }))
+      .sort((a, b) => a.straight - b.straight)
+      .slice(0, 6);
 
-    const sorted = geocodedFacilities
-      .map(f => ({ ...f, straight: haversine(empCoords.lat, empCoords.lon, f.lat, f.lon) }))
-      .sort((a,b) => a.straight - b.straight)
-      .slice(0, 8);
+    area.innerHTML = '<div class="loading"><div class="spinner"></div> Calculating road distances for top matches...</div>';
 
-    let best = sorted[0], bestKm = sorted[0].straight, isRoad = false;
-    try {
-      const roads = await getRoadDistances(empCoords.lat, empCoords.lon, pin, sorted);
-      if (Array.isArray(roads) && roads.length) {
-        roads.sort((a,b) => a.km - b.km);
-        const r = roads[0];
-        const idx = (r.i || 1) - 1;
-        if (sorted[idx]) { best = sorted[idx]; bestKm = r.km; isRoad = true; }
-      }
-    } catch(e) { console.warn('Road distance fallback:', e.message); }
+    // Step 3: get OSRM road distances for top 6
+    const withRoad = [];
+    for (const f of sorted) {
+      const km = await osrmDistance(emp.lat, emp.lon, f.lat, f.lon);
+      withRoad.push({ ...f, roadKm: km !== null ? km : f.straight, isRoad: km !== null });
+      await delay(200);
+    }
+    withRoad.sort((a, b) => a.roadKm - b.roadKm);
+    const best = withRoad[0];
 
-    const distLabel = bestKm < 1 ? (bestKm*1000).toFixed(0)+' m' : bestKm.toFixed(1)+' km';
-    const distNote = isRoad ? 'by road' : 'straight-line estimate';
+    const distLabel = best.roadKm < 1
+      ? (best.roadKm * 1000).toFixed(0) + ' m'
+      : best.roadKm.toFixed(1) + ' km';
+    const distNote = best.isRoad ? 'by road' : 'straight-line estimate';
     const mapUrl = `https://www.openstreetmap.org/export/embed.html?bbox=${(best.lon-0.05).toFixed(4)},${(best.lat-0.05).toFixed(4)},${(best.lon+0.05).toFixed(4)},${(best.lat+0.05).toFixed(4)}&layer=mapnik&marker=${best.lat.toFixed(4)},${best.lon.toFixed(4)}`;
 
     area.innerHTML = `
@@ -269,36 +251,37 @@ async function findNearest() {
           <div class="result-item full">
             <label>Facility location</label>
             <div class="map-thumb">
-              <iframe src="${mapUrl}" title="ESIC facility location map" loading="lazy"></iframe>
+              <iframe src="${mapUrl}" title="ESIC facility location" loading="lazy"></iframe>
             </div>
           </div>
         </div>
-        <p class="note">Road distance is an AI estimate based on Indian road network knowledge.</p>
+        <p class="note">Road distance via OpenStreetMap routing.</p>
       </div>`;
-  } catch(e) {
-    area.innerHTML = '<div class="error">Something went wrong: ' + e.message + '</div>';
+  } catch(err) {
+    area.innerHTML = '<div class="error">Something went wrong: ' + err.message + '</div>';
   }
   document.getElementById('searchBtn').disabled = false;
 }
 
+// Admin
 function showAdminLogin() { document.getElementById('adminOverlay').classList.add('show'); setTimeout(() => document.getElementById('adminPass').focus(), 100); }
 function closeModal() { document.getElementById('adminOverlay').classList.remove('show'); document.getElementById('adminPass').value = ''; document.getElementById('loginError').style.display = 'none'; }
 function doLogin() { if (document.getElementById('adminPass').value === ADMIN_PASS) { closeModal(); document.getElementById('uploadOverlay').classList.add('show'); } else { document.getElementById('loginError').style.display = 'block'; } }
 function closeUpload() { document.getElementById('uploadOverlay').classList.remove('show'); document.getElementById('uploadStatus').innerHTML = ''; document.getElementById('uploadProgress').style.display = 'none'; }
 
-function setProgress(done, total) {
+function setProgress(done, total, label) {
   const pct = Math.round((done/total)*100);
   document.getElementById('progressFill').style.width = pct+'%';
   document.getElementById('progressPct').textContent = pct+'%';
-  document.getElementById('progressText').textContent = `Geocoding ${done} of ${total} facilities...`;
+  document.getElementById('progressText').textContent = label || `Geocoding ${done} of ${total}...`;
 }
 
 async function handleFile(e) {
   const file = e.target.files[0]; if (!file) return;
   const statusEl = document.getElementById('uploadStatus');
-  const progressEl = document.getElementById('uploadProgress');
+  const progEl = document.getElementById('uploadProgress');
   statusEl.innerHTML = '<div class="loading"><div class="spinner"></div> Reading file...</div>';
-  progressEl.style.display = 'none';
+  progEl.style.display = 'none';
   document.getElementById('closeUploadBtn').disabled = true;
 
   const reader = new FileReader();
@@ -318,30 +301,25 @@ async function handleFile(e) {
         const pin = String(row[pk]).trim();
         const buildId = String(row[bk]).trim();
         if (/^\d{6}$/.test(pin) && buildId) {
-          parsed.push({ state: sk ? String(row[sk]).trim() : '', city: ck ? String(row[ck]).trim() : '', pin, buildId, lat: null, lon: null });
+          parsed.push({ state: sk ? String(row[sk]).trim():'', city: ck ? String(row[ck]).trim():'', pin, buildId, lat: null, lon: null });
         }
       }
-      if (!parsed.length) { statusEl.innerHTML = '<div class="error">No valid rows found. Check column names.</div>'; document.getElementById('closeUploadBtn').disabled = false; return; }
+      if (!parsed.length) { statusEl.innerHTML = '<div class="error">No valid rows found.</div>'; document.getElementById('closeUploadBtn').disabled=false; return; }
 
-      statusEl.innerHTML = `<div class="info">Read ${parsed.length} facilities. Geocoding now — one-time process...</div>`;
-      progressEl.style.display = 'block';
-      setProgress(0, parsed.length);
-
+      // Deduplicate PINs for geocoding
       const uniquePins = [...new Set(parsed.map(f => f.pin))];
-      const coordMap = {};
-      const batchSize = 30;
-      let done = 0;
+      statusEl.innerHTML = `<div class="info">Read ${parsed.length} facilities (${uniquePins.length} unique PINs). Geocoding via OpenStreetMap — please wait...</div>`;
+      progEl.style.display = 'block';
+      setProgress(0, uniquePins.length);
 
-      for (let i = 0; i < uniquePins.length; i += batchSize) {
-        const batch = uniquePins.slice(i, i+batchSize);
+      const coordMap = {};
+      for (let i = 0; i < uniquePins.length; i++) {
         try {
-          const results = await geocodePins(batch);
-          if (Array.isArray(results)) {
-            for (const r of results) { if (r && r.lat != null) coordMap[String(r.pin)] = { lat: r.lat, lon: r.lon }; }
-          }
-        } catch(err) { console.warn('Batch geocode error:', err.message); }
-        done = Math.min(done+batchSize, uniquePins.length);
-        setProgress(done, uniquePins.length);
+          const c = await nominatimGeocode(uniquePins[i]);
+          if (c) coordMap[uniquePins[i]] = c;
+        } catch(err) { console.warn('Geocode fail for', uniquePins[i], err.message); }
+        setProgress(i+1, uniquePins.length);
+        await delay(1100); // Nominatim rate limit: max 1 req/sec
       }
 
       for (const f of parsed) {
@@ -349,14 +327,12 @@ async function handleFile(e) {
       }
 
       const ok = lsSet(LS_DATA, parsed);
-      if (!ok) {
-        statusEl.innerHTML = '<div class="error">Storage full. Try clearing browser data and re-uploading.</div>';
-        document.getElementById('closeUploadBtn').disabled = false; return;
-      }
+      if (!ok) { statusEl.innerHTML = '<div class="error">Storage limit exceeded. Try a smaller dataset.</div>'; document.getElementById('closeUploadBtn').disabled=false; return; }
+
       esicData = parsed;
       updateDbStatus();
-      setProgress(uniquePins.length, uniquePins.length);
       const geocoded = parsed.filter(f => f.lat != null).length;
+      setProgress(uniquePins.length, uniquePins.length, 'Complete!');
       statusEl.innerHTML = `<div class="success">Done! ${parsed.length} facilities loaded, ${geocoded} geocoded. Searches are now fast!</div>`;
       document.getElementById('fileInput').value = '';
     } catch(err) {
