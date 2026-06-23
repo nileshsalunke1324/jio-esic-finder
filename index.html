@@ -115,17 +115,38 @@ function rad(d){return d*Math.PI/180;}
 function hav(a,b,c,d){var R=6371,da=rad(c-a),db=rad(d-b),x=Math.sin(da/2)*Math.sin(da/2)+Math.cos(rad(a))*Math.cos(rad(c))*Math.sin(db/2)*Math.sin(db/2);return R*2*Math.atan2(Math.sqrt(x),Math.sqrt(1-x));}
 function wait(ms){return new Promise(function(r){setTimeout(r,ms);});}
 function ft(url,ms){var c=new AbortController(),id=setTimeout(function(){c.abort();},ms);return fetch(url,{signal:c.signal}).finally(function(){clearTimeout(id);});}
+
+// 3-step geocoding: Nominatim PIN → India Post API → Nominatim district name
 function ngeo(pin){
+  // Step 1: Nominatim direct PIN lookup
   return ft('https://nominatim.openstreetmap.org/search?postalcode='+encodeURIComponent(pin)+'&countrycodes=in&format=json&limit=1',6000)
     .then(function(r){return r.ok?r.json():[];})
-    .then(function(d){return d&&d.length?{lat:parseFloat(d[0].lat),lon:parseFloat(d[0].lon)}:null;})
+    .then(function(d){
+      if(d&&d.length) return {lat:parseFloat(d[0].lat),lon:parseFloat(d[0].lon)};
+      // Step 2: India Post API — get district & state for this PIN
+      return ft('https://api.postalpincode.in/pincode/'+pin,6000)
+        .then(function(r){return r.ok?r.json():null;})
+        .then(function(d){
+          if(!d||!d[0]||d[0].Status!=='Success'||!d[0].PostOffice||!d[0].PostOffice.length) return null;
+          var po=d[0].PostOffice[0];
+          var q=po.District+', '+po.State+', India';
+          // Step 3: Nominatim geocode by district name
+          return ft('https://nominatim.openstreetmap.org/search?q='+encodeURIComponent(q)+'&format=json&limit=1',6000)
+            .then(function(r){return r.ok?r.json():[];})
+            .then(function(d2){return d2&&d2.length?{lat:parseFloat(d2[0].lat),lon:parseFloat(d2[0].lon)}:null;})
+            .catch(function(){return null;});
+        })
+        .catch(function(){return null;});
+    })
     .catch(function(){
+      // Photon fallback
       return ft('https://photon.komoot.io/api/?q='+encodeURIComponent(pin+' India')+'&limit=1&lang=en',6000)
         .then(function(r){return r.ok?r.json():{features:[]};})
         .then(function(d){if(d.features&&d.features.length){var c=d.features[0].geometry.coordinates;return{lat:c[1],lon:c[0]};}return null;})
         .catch(function(){return null;});
     });
 }
+
 function osrm(la1,lo1,la2,lo2){
   return ft('https://router.project-osrm.org/route/v1/driving/'+lo1+','+la1+';'+lo2+','+la2+'?overview=false',6000)
     .then(function(r){return r.json();})
@@ -183,7 +204,10 @@ function findNearest(){
   document.getElementById('searchBtn').disabled=true;
   area.innerHTML='<div class="loading"><div class="spinner"></div> Locating employee PIN code...</div>';
   var emp=empCache[pin];
-  var empP=emp?Promise.resolve(emp):ngeo(pin).then(function(e){if(!e)throw new Error('Could not locate PIN '+pin);empCache[pin]=e;lsS(LEMP,empCache);return e;});
+  var empP=emp?Promise.resolve(emp):ngeo(pin).then(function(e){
+    if(!e)throw new Error('PIN code '+pin+' could not be located. Please check it is a valid Indian PIN code and try again.');
+    empCache[pin]=e;lsS(LEMP,empCache);return e;
+  });
   empP.then(function(emp){
     var sorted=gf.map(function(f){return Object.assign({},f,{st:hav(emp.lat,emp.lon,f.lat,f.lon)});}).sort(function(a,b){return a.st-b.st;}).slice(0,6);
     area.innerHTML='<div class="loading"><div class="spinner"></div> Calculating road distances...</div>';
